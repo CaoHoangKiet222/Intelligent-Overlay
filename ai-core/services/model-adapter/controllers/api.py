@@ -7,6 +7,7 @@ from config import AppConfig
 from providers.registry import ProviderRegistry
 from routing.policy import RouterPolicy, RoutingCriteria
 from services.generation_service import GenerationService
+from guardrails.pipeline import apply_guardrails
 
 
 class HealthResponse(BaseModel):
@@ -56,6 +57,10 @@ def create_app() -> FastAPI:
 
 	@app.post("/generate", response_model=GenerateResponse)
 	def generate(req: GenerateRequest) -> GenerateResponse:
+		# Guardrails: normalize + PII mask + policy check + system prompt prepend
+		payload = {"prompt": req.prompt, "context": None}
+		safe_payload = apply_guardrails(payload)
+		redacted_prompt = safe_payload["prompt"]
 		criteria = RoutingCriteria(
 			cost_target=req.cost_target,
 			latency_target_ms=req.latency_target_ms,
@@ -66,7 +71,7 @@ def create_app() -> FastAPI:
 		provider = policy.choose_provider_for_generation(criteria)
 		if provider is None:
 			raise HTTPException(status_code=422, detail="No suitable provider found")
-		output = gen_service.generate(provider.name, req.prompt)
+		output = gen_service.generate(provider.name, redacted_prompt)
 		return GenerateResponse(provider=provider.name, output=output)
 
 	@app.post("/embed", response_model=EmbedResponse)
