@@ -1,0 +1,4 @@
+class TransientHTTPError(Exception):
+	pass
+
+
