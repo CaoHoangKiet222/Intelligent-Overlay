@@ -2,6 +2,13 @@
 
 FastAPI service trừu tượng hoá đa LLM (Adapter + RouterPolicy), có Guardrails (PII masking + policy).
 
+## Mục đích
+
+- Cung cấp lớp trừu tượng cho nhiều nhà cung cấp LLM (OpenAI/Anthropic/Mistral/Ollama) theo chuẩn chung.
+- Tuyến chọn provider theo policy (cost/latency/context/language).
+- Bảo vệ đầu vào với Guardrails (mask PII, chặn jailbreak) và prepend system prompt.
+- Xuất metrics/tracing để theo dõi hiệu năng và chi phí sử dụng LLM.
+
 ## Chạy nhanh (Docker)
 
 - `docker compose up -d --build model-adapter`

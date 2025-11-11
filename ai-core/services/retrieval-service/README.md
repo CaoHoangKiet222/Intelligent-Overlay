@@ -2,6 +2,12 @@
 
 Hybrid search (pgvector cosine + pg_trgm similarity), ingestion PDF/Text/Transcript, citation spans.
 
+## Mục đích
+
+- Cung cấp dịch vụ ingest tài liệu, segment + embed để phục vụ RAG.
+- Tìm kiếm hybrid (vector + trigram) tối ưu latency và chất lượng, trả spans/offset cho citation.
+- Bộc lộ metrics latency/candidates để theo dõi hiệu năng và tuning.
+
 ## Chạy nhanh (Docker)
 
 - `docker compose up -d --build retrieval-service`

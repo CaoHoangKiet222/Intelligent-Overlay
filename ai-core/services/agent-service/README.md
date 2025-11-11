@@ -2,6 +2,12 @@
 
 Pipeline: policy_guard → intake → retrieval → planner → tool_call → answer → fallback.
 
+## Mục đích
+
+- Xây dựng pipeline agent có thể mở rộng bằng LangGraph, tách rõ từng bước xử lý.
+- Tích hợp RAG (retrieval) và tool calling để trả lời chính xác và có trích dẫn.
+- Ghi log từng bước giúp dễ quan sát và gỡ lỗi; có fallback khi tool lỗi.
+
 ## Chạy nhanh (Docker)
 
 - `docker compose up -d --build agent-service retrieval-service model-adapter`

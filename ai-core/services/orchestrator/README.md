@@ -2,6 +2,13 @@
 
 Kafka consumer ➜ fan-out 4 Ray workers ➜ fan-in aggregate; lưu `llm_calls` + `analysis_runs`, DLQ khi cần.
 
+## Mục đích
+
+- Điều phối luồng phân tích đa tác vụ (summary/argument/sentiment/logic_bias) theo mô hình fan-out/fan-in.
+- Đảm bảo idempotency theo `event_id`, ghi audit vào `llm_calls`, lưu kết quả hợp nhất vào `analysis_runs`.
+- Tính bền bỉ: retry nội bộ ở worker, DLQ khi lỗi không phục hồi, partial khi một phần thất bại.
+- Quan sát: metrics latency, failures, partial, DLQ; tracing Kafka + HTTP.
+
 ## Chạy nhanh (Docker)
 
 - `docker compose up -d --build orchestrator ray-head ray-worker`

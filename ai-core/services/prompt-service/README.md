@@ -2,6 +2,13 @@
 
 Quản lý Prompt + Versioning + Cache Redis + Jinja2 validation.
 
+## Mục đích
+
+- Quản lý vòng đời prompt và version, đảm bảo truy xuất phiên bản chính xác.
+- Xác thực template với Jinja2 để tránh thiếu/extra placeholders (trả 400).
+- Tối ưu hiệu năng đọc bằng Redis cache (key theo `prompt:{id}:v:{version}`).
+- Cung cấp metrics/observability để theo dõi hit/miss/invalidations.
+
 ## Chạy nhanh (Docker)
 
 - `docker compose up -d --build prompt-service`
