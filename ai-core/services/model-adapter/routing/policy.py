@@ -1,0 +1,51 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Optional
+from providers.base import BaseProvider
+from providers.registry import ProviderRegistry
+
+
+@dataclass(frozen=True)
+class RoutingCriteria:
+	cost_target: Optional[float]
+	latency_target_ms: Optional[int]
+	context_len: Optional[int]
+	language: Optional[str]
+	provider_hint: Optional[str]
+
+
+class RouterPolicy:
+	def __init__(self, registry: ProviderRegistry) -> None:
+		self._registry = registry
+
+	def default_embedding_provider(self) -> str:
+		return "openai" if "openai" in self._registry.names() else self._registry.names()[0]
+
+	def choose_provider_for_generation(self, criteria: RoutingCriteria) -> Optional[BaseProvider]:
+		if criteria.provider_hint:
+			return self._registry.get(criteria.provider_hint)
+
+		candidates = [self._registry.get(n) for n in self._registry.names()]
+
+		if criteria.context_len is not None:
+			candidates = [p for p in candidates if p.context_window >= criteria.context_len]
+			if not candidates:
+				return None
+
+		if criteria.cost_target is not None:
+			candidates = sorted(candidates, key=lambda p: p.cost_per_1k_tokens)
+			candidates = [p for p in candidates if p.cost_per_1k_tokens <= criteria.cost_target] or candidates
+
+		if criteria.latency_target_ms is not None:
+			candidates = sorted(candidates, key=lambda p: p.latency_ms_estimate)
+			candidates = [p for p in candidates if p.latency_ms_estimate <= criteria.latency_target_ms] or candidates
+
+		if criteria.language:
+			if criteria.language.lower().startswith("vi"):
+				candidates = sorted(candidates, key=lambda p: p.cost_per_1k_tokens)
+			else:
+				candidates = sorted(candidates, key=lambda p: p.latency_ms_estimate)
+
+		return candidates[0] if candidates else None
+
+
