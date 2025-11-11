@@ -1,0 +1,18 @@
+name: CD Staging on Tag
+on:
+  push:
+    tags:
+      - "stg-*"
+jobs:
+  build-push:
+    uses: ./.github/workflows/_reusable-build.yml
+    with:
+      services: '["model-adapter","prompt-service","retrieval-service","orchestrator","agent-service"]'
+      push: true
+      tag-suffix: ${{ github.ref_name }}
+  notify-argocd:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify
+        run: echo "Images tagged ${{ github.ref_name }} pushed. ArgoCD Image Updater will sync staging."

@@ -1,0 +1,8 @@
+image:
+  repository: ghcr.io/ORG/model-adapter
+  tag: "stg-PLACEHOLDER"
+service:
+  port: 8000
+env:
+  - name: SERVICE_NAME
+    value: "model-adapter"

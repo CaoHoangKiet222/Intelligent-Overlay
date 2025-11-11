@@ -1,0 +1,37 @@
+name: CI Main - Build & Push
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ai-core/services/**"
+      - ".github/workflows/_reusable-build.yml"
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          list-files: json
+          filters: |
+            model-adapter:
+              - 'ai-core/services/model-adapter/**'
+            prompt-service:
+              - 'ai-core/services/prompt-service/**'
+            retrieval-service:
+              - 'ai-core/services/retrieval-service/**'
+            orchestrator:
+              - 'ai-core/services/orchestrator/**'
+            agent-service:
+              - 'ai-core/services/agent-service/**'
+  build:
+    needs: detect
+    if: needs.detect.outputs.services != '[]'
+    uses: ./.github/workflows/_reusable-build.yml
+    with:
+      services: ${{ needs.detect.outputs.services }}
+      push: true
+      tag-suffix: latest

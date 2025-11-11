@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: aicore-apps
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - name: model-adapter
+          - name: prompt-service
+          - name: retrieval-service
+          - name: orchestrator
+          - name: agent-service
+  template:
+    metadata:
+      name: "{{name}}-staging"
+      annotations:
+        argocd-image-updater.argoproj.io/write-back-method: argocd
+        argocd-image-updater.argoproj.io/{{name}}.allow-tags: regexp:^stg-.*$
+        argocd-image-updater.argoproj.io/{{name}}.update-strategy: latest
+        argocd-image-updater.argoproj.io/image-list: "{{name}}=ghcr.io/CaoHoangKiet222/{{name}}"
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/CaoHoangKiet222/Intelligent-Overlay
+        targetRevision: master
+        path: charts/aicore-app
+        helm:
+          valueFiles:
+            - deploy/values/staging/{{name}}.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: staging
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

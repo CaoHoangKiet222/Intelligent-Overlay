@@ -8,6 +8,9 @@ from providers.registry import ProviderRegistry
 from routing.policy import RouterPolicy, RoutingCriteria
 from services.generation_service import GenerationService
 from guardrails.pipeline import apply_guardrails
+from shared.telemetry.otel import init_otel
+from shared.telemetry.logger import setup_json_logger
+from shared.telemetry.metrics import metrics_app
 
 
 class HealthResponse(BaseModel):
@@ -45,7 +48,10 @@ def create_app() -> FastAPI:
 	policy = RouterPolicy(registry)
 	gen_service = GenerationService(registry, policy)
 
+	setup_json_logger()
 	app = FastAPI(title="model-adapter")
+	app.mount("/metrics", metrics_app)
+	init_otel(app)
 
 	@app.get("/healthz", response_model=HealthResponse)
 	def healthz() -> HealthResponse:

@@ -5,10 +5,14 @@ from kafka.consumer import serve
 from kafka.producer import DlqProducer
 from data.repositories import LlmCallRepo, AnalysisRunRepo, IdempotencyRepo
 from orchestration.orchestrator_service import OrchestratorService
+from shared.telemetry.otel import init_otel
+from shared.telemetry.logger import setup_json_logger
 
 
+setup_json_logger()
 app = FastAPI(title="AI Core Orchestrator", version="0.1.0")
 app.mount("/metrics", metrics_app)
+init_otel(app)
 
 
 @app.on_event("startup")
