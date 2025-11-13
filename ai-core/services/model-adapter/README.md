@@ -18,9 +18,12 @@ FastAPI service trừu tượng hoá đa LLM (Adapter + RouterPolicy), có Guard
 ## Chạy local (Python)
 
 - `cd ai-core/services/model-adapter`
+- `python3 -m venv .venv`
+- `source .venv/bin/activate`
 - `pip install -r requirements.txt`
 - (tuỳ chọn) `python -m spacy download en_core_web_sm` để bật Presidio masking
 - Chạy: `uvicorn controllers.api:app --host 0.0.0.0 --port 8000`
+- Thoát virtualenv: `deactivate`
 
 ## Env chính
 

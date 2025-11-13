@@ -26,7 +26,11 @@
 4. Migrations (nếu cần):
 
 - Prompt/Retrieval/Orchestrator dùng schema từ P2/P6. Chạy Alembic tại thư mục migrations tương ứng hoặc tại `ai-core/db`:
-- `cd ai-core/db && pip install -r requirements.txt && DB_DSN="postgresql+psycopg://ai:ai@localhost:5432/ai_core" alembic upgrade head`
+- `cd ai-core/db`
+- `python3 -m venv .venv`
+- `source .venv/bin/activate`
+- `pip install -r requirements.txt`
+- `DB_DSN="postgresql+psycopg://ai:ai@localhost:5432/ai_core" alembic upgrade head`
 
 ## Services
 
