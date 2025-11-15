@@ -12,6 +12,7 @@
 ### Model Adapter
 
 - Vị trí: `ai-core/services/model-adapter`.
+- Cấu trúc: Entry point tại `app/main.py`, cấu hình tại `app/config.py`, controllers tại `controllers/api.py`.
 - Chức năng: trừu tượng hóa gọi LLM/embedding, áp dụng guardrails (PII masking, policy, system prompt), chọn nhà cung cấp theo chính sách routing.
 - Endpoint chính: `POST /generate`, `POST /embed`, `GET /providers`.
 - Tích hợp provider qua `providers/` (OpenAI, Anthropic, Mistral, Ollama) và điều phối bằng `routing/policy.py`.
@@ -20,6 +21,7 @@
 ### Prompt Service
 
 - Vị trí: `ai-core/services/prompt-service`.
+- Cấu trúc: Entry point tại `app/main.py`, cấu hình tại `app/config.py`, dependencies tại `app/deps.py`.
 - Chức năng: quản lý vòng đời prompt/template, lưu versioning, định nghĩa schema đầu vào/ra, cung cấp API đọc/ghi kèm caching Redis.
 - Endpoint chính: `POST /prompts`, `POST /prompts/{id}/versions`, `GET /prompts/{id}` với tham số `version`.
 - Sử dụng Alembic/PostgreSQL cho lưu trữ, chuẩn hóa template qua `domain.validators`.
@@ -27,6 +29,7 @@
 ### Retrieval Service
 
 - Vị trí: `ai-core/services/retrieval-service`.
+- Cấu trúc: Entry point tại `app/main.py`, cấu hình tại `app/config.py`, dependencies tại `app/deps.py`.
 - Chức năng: ingest tài liệu, xây dựng kho embedding (pgvector) và tìm kiếm lai (vector + trigram).
 - Endpoint chính: `POST /ingest`, `POST /search`.
 - Luồng search gọi `model-adapter` để làm embedding truy vấn, sau đó thực thi truy vấn SQL lai (HYBRID) và tính highlight.
@@ -43,6 +46,7 @@
 ### Orchestrator
 
 - Vị trí: `ai-core/services/orchestrator`.
+- Cấu trúc: Entry point tại `app/main.py`, cấu hình tại `app/config.py`.
 - Chức năng: xử lý hàng loạt tác vụ phân tích (summary, argument, sentiment, logic bias). Tiêu thụ Kafka topic, phân tán công việc qua Ray, tổng hợp kết quả, quản lý idempotency và dead-letter queue.
 - Tích hợp với repository Postgres để lưu `analysis_runs` và `llm_calls`.
 - Worker Ray định nghĩa trong `workers/*`, aggregator tổng hợp trạng thái tại `orchestration/aggregator.py`.
@@ -189,6 +193,28 @@ sequenceDiagram
 - **Docker Compose**: File `docker-compose.yaml` dựng toàn bộ stack local (Postgres, Redis, MinIO, Ray, các service).
 - **Helm Chart**: `charts/aicore-app` chứa manifest triển khai Kubernetes (Deployment, Service, HPA, Ingress, ServiceMonitor).
 - **ArgoCD / GitOps**: Thư mục `deploy/apps/app-of-apps.yaml` cấu hình App-of-Apps và giá trị riêng cho môi trường (`deploy/values/staging/*.yaml`).
+
+## Cấu trúc thư mục chuẩn
+
+Mỗi service tuân theo cấu trúc thư mục nhất quán:
+
+```
+service-name/
+├── app/                    # Entry point và cấu hình
+│   ├── __init__.py
+│   ├── main.py            # FastAPI app instance
+│   ├── config.py          # Cấu hình từ environment variables
+│   └── deps.py            # Dependencies injection (nếu có)
+├── domain/                # Business logic và schemas
+├── data/                  # Database models và repositories
+├── controllers/           # API controllers (nếu có)
+├── routers/               # FastAPI routers (nếu có)
+├── services/              # Business services (nếu có)
+├── tests/                 # Unit và integration tests
+├── requirements.txt
+├── Dockerfile
+└── README.md
+```
 
 ## Thư viện dùng chung
 

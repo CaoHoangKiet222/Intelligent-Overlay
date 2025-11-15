@@ -1,7 +1,7 @@
 import json
 from typing import Optional, Dict, Any
 import redis.asyncio as redis
-from config import PROMPT_CACHE_TTL_SECONDS, REDIS_URL
+from app.config import PROMPT_CACHE_TTL_SECONDS, REDIS_URL
 
 
 class PromptCache:

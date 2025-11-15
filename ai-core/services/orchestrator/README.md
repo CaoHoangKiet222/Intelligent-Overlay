@@ -24,7 +24,7 @@ Yêu cầu Kafka broker/Topic: `analysis.tasks`, `analysis.dlq`, và Postgres.
 - `source .venv/bin/activate`
 - `pip install -r requirements.txt`
 - Đặt env Kafka/DB/Model Adapter/Prompt Service
-- `uvicorn app:app --host 0.0.0.0 --port 8000`
+- `uvicorn app.main:app --host 0.0.0.0 --port 8000`
 - Thoát virtualenv: `deactivate`
 
 ## Luồng xử lý

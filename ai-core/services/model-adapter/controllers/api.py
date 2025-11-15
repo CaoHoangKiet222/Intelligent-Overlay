@@ -1,9 +1,16 @@
 import os
+import sys
+from pathlib import Path
+
+ai_core_path = Path(__file__).parent.parent.parent.parent
+if str(ai_core_path) not in sys.path:
+	sys.path.insert(0, str(ai_core_path))
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
 
-from config import AppConfig
+from app.config import AppConfig
 from providers.registry import ProviderRegistry
 from routing.policy import RouterPolicy, RoutingCriteria
 from services.generation_service import GenerationService

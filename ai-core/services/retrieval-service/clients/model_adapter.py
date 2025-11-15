@@ -1,7 +1,7 @@
 import os
 import httpx
 from typing import List, Dict, Any
-from config import MODEL_ADAPTER_BASE_URL, EMBED_MODEL_HINT
+from app.config import MODEL_ADAPTER_BASE_URL, EMBED_MODEL_HINT
 
 
 async def embed_texts(texts: List[str]) -> Dict[str, Any]:

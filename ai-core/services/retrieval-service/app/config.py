@@ -9,4 +9,3 @@ VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "100"))
 TRGM_CANDIDATES = int(os.getenv("TRGM_CANDIDATES", "200"))
 TOP_K = int(os.getenv("TOP_K", "10"))
 
-

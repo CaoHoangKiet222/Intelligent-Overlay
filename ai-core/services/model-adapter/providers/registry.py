@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List
 from providers.base import BaseProvider
-from config import AppConfig
+from app.config import AppConfig
 from providers.openai_provider import OpenAIProvider
 from providers.anthropic_provider import AnthropicProvider
 from providers.mistral_provider import MistralProvider

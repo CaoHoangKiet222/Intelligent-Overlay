@@ -13,7 +13,7 @@ class Document(Base):
 	title = Column(Text)
 	locale = Column(String(10))
 	content_hash = Column(String(64))
-	metadata = Column(JSONB)
+	meta = Column("metadata", JSONB)  # Use 'meta' as Python attribute, 'metadata' as DB column name
 	created_at = Column(TIMESTAMP(timezone=True))
 	updated_at = Column(TIMESTAMP(timezone=True))
 

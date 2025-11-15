@@ -1,5 +1,5 @@
-from ...domain.state import AgentState
-from ...tools.registry import REGISTRY
+from domain.state import AgentState
+from tools.registry import REGISTRY
 
 
 async def node_tool_call(state: AgentState) -> AgentState:

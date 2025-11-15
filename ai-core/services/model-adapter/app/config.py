@@ -17,4 +17,3 @@ class AppConfig:
 			parsed = {}
 		return AppConfig(provider_keys=parsed)
 
-

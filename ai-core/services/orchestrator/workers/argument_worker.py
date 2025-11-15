@@ -1,9 +1,9 @@
+import asyncio
 import ray
 from workers.base import fetch_prompt, call_llm_generate
 
 
-@ray.remote
-async def run_argument(task: dict) -> dict:
+async def _run_argument_async(task: dict) -> dict:
 	prompt_id = (task.get("prompt_ids") or {}).get("argument")
 	template, _vars = await fetch_prompt(prompt_id)
 	seg_text = "\n".join(s.get("text", "") for s in (task.get("segments") or [])[:8])
@@ -12,3 +12,6 @@ async def run_argument(task: dict) -> dict:
 	return {"worker": "argument", "ok": True, "output": {"text": resp.get("output", "")}, "llm_call": resp}
 
 
+@ray.remote
+def run_argument(task: dict) -> dict:
+	return asyncio.run(_run_argument_async(task))

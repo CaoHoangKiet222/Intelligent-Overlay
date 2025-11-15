@@ -1,5 +1,5 @@
-from ...domain.state import AgentState
-from ...clients.retrieval_service import hybrid_search
+from domain.state import AgentState
+from clients.retrieval_service import hybrid_search
 
 
 async def node_retrieval(state: AgentState) -> AgentState:

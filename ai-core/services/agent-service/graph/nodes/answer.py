@@ -1,6 +1,6 @@
-from ...domain.state import AgentState
-from ...domain.composer import build_answer_prompt
-from ...clients.model_adapter import llm_generate
+from domain.state import AgentState
+from domain.composer import build_answer_prompt
+from clients.model_adapter import llm_generate
 
 
 async def node_answer(state: AgentState) -> AgentState:

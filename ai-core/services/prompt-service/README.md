@@ -22,7 +22,7 @@ Quản lý Prompt + Versioning + Cache Redis + Jinja2 validation.
 - `source .venv/bin/activate`
 - `pip install -r requirements.txt`
 - Copy `env.example` → `.env` (hoặc đặt `DATABASE_URL`, `REDIS_URL`)
-- `uvicorn app:app --host 0.0.0.0 --port 8000`
+- `uvicorn app.main:app --host 0.0.0.0 --port 8000`
 - Thoát virtualenv: `deactivate`
 
 ## Endpoints

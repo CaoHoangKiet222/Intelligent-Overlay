@@ -4,6 +4,7 @@ from domain.schemas import PromptCreate, PromptVersionCreate
 from domain.validators import validate_template
 from data.repositories import PromptRepo
 from cache.redis_cache import PromptCache
+from app.deps import get_cache_dep, get_repo_dep
 from metrics.prometheus import prompt_cache_hit, prompt_cache_miss, prompt_cache_invalidate
 
 
@@ -11,7 +12,7 @@ router = APIRouter(prefix="/prompts", tags=["prompts"])
 
 
 @router.post("", status_code=201)
-async def create_prompt(payload: PromptCreate, repo: PromptRepo = Depends(lambda: PromptRepo())) -> Dict[str, Any]:
+async def create_prompt(payload: PromptCreate, repo: PromptRepo = Depends(get_repo_dep)) -> Dict[str, Any]:
 	if await repo.get_prompt_by_key(payload.key):
 		raise HTTPException(status_code=409, detail="prompt key already exists")
 	pr = await repo.create_prompt(payload)
@@ -20,8 +21,8 @@ async def create_prompt(payload: PromptCreate, repo: PromptRepo = Depends(lambda
 
 @router.post("/{prompt_id}/versions", status_code=201)
 async def create_version(prompt_id: str, payload: PromptVersionCreate,
-                         repo: PromptRepo = Depends(lambda: PromptRepo()),
-                         cache: PromptCache = Depends(lambda: PromptCache("redis://redis:6379/0"))) -> Dict[str, Any]:
+                         repo: PromptRepo = Depends(get_repo_dep),
+                         cache: PromptCache = Depends(get_cache_dep)) -> Dict[str, Any]:
 	validate_template(payload.template, payload.variables or {})
 	pv = await repo.create_prompt_version(prompt_id, payload)
 	await cache.invalidate(prompt_id, pv.version)
@@ -31,8 +32,8 @@ async def create_version(prompt_id: str, payload: PromptVersionCreate,
 
 @router.get("/{prompt_id}")
 async def get_prompt(prompt_id: str, version: Optional[int] = Query(default=None),
-                     repo: PromptRepo = Depends(lambda: PromptRepo()),
-                     cache: PromptCache = Depends(lambda: PromptCache("redis://redis:6379/0"))) -> Dict[str, Any]:
+                     repo: PromptRepo = Depends(get_repo_dep),
+                     cache: PromptCache = Depends(get_cache_dep)) -> Dict[str, Any]:
 	if version is None:
 		pv = await repo.get_latest_version(prompt_id)
 		if not pv:

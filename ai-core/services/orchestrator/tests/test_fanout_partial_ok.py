@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from app import app
+from app.main import app
 from domain.schemas import AnalysisTask
 
 
