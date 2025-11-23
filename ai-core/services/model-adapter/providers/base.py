@@ -25,6 +25,16 @@ class BaseProvider(ABC):
 	def context_window(self) -> int:
 		raise NotImplementedError
 
+	@property
+	@abstractmethod
+	def generation_model(self) -> str:
+		raise NotImplementedError
+
+	@property
+	@abstractmethod
+	def embedding_model(self) -> str:
+		raise NotImplementedError
+
 	@abstractmethod
 	def generate(self, prompt: str) -> GenerationResult:
 		raise NotImplementedError

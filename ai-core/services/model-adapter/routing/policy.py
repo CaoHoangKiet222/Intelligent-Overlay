@@ -21,6 +21,17 @@ class RouterPolicy:
 	def default_embedding_provider(self) -> str:
 		return "openai" if "openai" in self._registry.names() else self._registry.names()[0]
 
+	def choose_provider_for_embedding(self, model_hint: Optional[str]) -> BaseProvider:
+		if model_hint:
+			if model_hint in self._registry.names():
+				return self._registry.get(model_hint)
+			lowered = model_hint.lower()
+			for name in self._registry.names():
+				provider = self._registry.get(name)
+				if provider.embedding_model.lower() == lowered:
+					return provider
+		return self._registry.get(self.default_embedding_provider())
+
 	def choose_provider_for_generation(self, criteria: RoutingCriteria) -> Optional[BaseProvider]:
 		if criteria.provider_hint:
 			return self._registry.get(criteria.provider_hint)

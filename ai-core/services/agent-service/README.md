@@ -28,3 +28,29 @@ Pipeline: policy_guard → intake → retrieval → planner → tool_call → an
 
 - `POST /agent/ask` body: `{query, session_id?, language?, meta?}`
 - Kết quả: `{answer, citations, plan, tool_result, logs}`
+
+### Ví dụ curl
+
+```bash
+curl -X POST http://localhost:8000/agent/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is the weather today?",
+    "session_id": "session-123",
+    "language": "en",
+    "meta": {
+      "user_id": "user-456",
+      "source": "web"
+    }
+  }'
+```
+
+Ví dụ tối giản (chỉ có query bắt buộc):
+
+```bash
+curl -X POST http://localhost:8000/agent/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is the weather today?"
+  }'
+```

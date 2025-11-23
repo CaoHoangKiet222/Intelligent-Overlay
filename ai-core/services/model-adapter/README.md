@@ -35,7 +35,7 @@ FastAPI service trừu tượng hoá đa LLM (Adapter + RouterPolicy), có Guard
 - `GET /healthz`
 - `GET /providers`
 - `POST /generate` body: `{prompt, language?, context_len?, cost_target?, latency_target_ms?, provider_hint?}`
-- `POST /embed` body: `{texts, model_hint?}`
+- `POST /embed` body: `{texts, model_hint?}` (`model_hint` có thể là tên provider hoặc tên embedding model cụ thể)
 
 ## Metrics/Tracing
 

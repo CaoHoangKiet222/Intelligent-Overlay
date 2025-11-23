@@ -1,11 +1,36 @@
+from __future__ import annotations
+
+import time
 from typing import List
-from domain.models import GenerationResult, EmbeddingResult
+
+import httpx
+
+from domain.errors import ProviderCallError
+from domain.models import EmbeddingResult, GenerationResult
 from providers.base import BaseProvider
+
+CHAT_COMPLETIONS_ENDPOINT = "/chat/completions"
+EMBEDDINGS_ENDPOINT = "/embeddings"
+DEFAULT_CHAT_MODEL = "gpt-4o-mini"
+DEFAULT_EMBED_MODEL = "text-embedding-3-small"
 
 
 class OpenAIProvider(BaseProvider):
-	def __init__(self, api_key: str) -> None:
-		self._api_key = api_key
+	def __init__(self, api_key: str, chat_model: str = DEFAULT_CHAT_MODEL, embedding_model: str = DEFAULT_EMBED_MODEL) -> None:
+		self._api_key = (api_key or "").strip()
+		self._chat_model = chat_model
+		self._embedding_model = embedding_model
+		self._mock_mode = not bool(self._api_key)
+		self._client: httpx.Client | None = None
+		if not self._mock_mode:
+			self._client = httpx.Client(
+				base_url="https://api.openai.com/v1",
+				timeout=httpx.Timeout(30.0, connect=10.0),
+				headers={
+					"Authorization": f"Bearer {self._api_key}",
+					"Content-Type": "application/json",
+				},
+			)
 
 	@property
 	def name(self) -> str:
@@ -23,14 +48,87 @@ class OpenAIProvider(BaseProvider):
 	def context_window(self) -> int:
 		return 128000
 
+	@property
+	def generation_model(self) -> str:
+		return self._chat_model
+
+	@property
+	def embedding_model(self) -> str:
+		return self._embedding_model
+
 	def generate(self, prompt: str) -> GenerationResult:
-		return GenerationResult(text=f"[openai] {prompt}")
+		start = time.perf_counter()
+		if self._mock_mode:
+			return self._mock_generation(prompt, start)
+
+		client = self._ensure_client()
+		payload = {
+			"model": self._chat_model,
+			"messages": [{"role": "user", "content": prompt}],
+			"temperature": 0.2,
+		}
+		try:
+			response = client.post(CHAT_COMPLETIONS_ENDPOINT, json=payload)
+			response.raise_for_status()
+		except httpx.HTTPError as exc:
+			raise ProviderCallError(f"openai chat error: {exc}") from exc
+
+		data = response.json()
+		choices = data.get("choices") or []
+		if not choices:
+			raise ProviderCallError("openai chat error: empty choices")
+
+		message = choices[0].get("message") or {}
+		content = message.get("content", "")
+		if isinstance(content, list):
+			content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
+
+		usage = data.get("usage") or {}
+		latency_ms = int((time.perf_counter() - start) * 1000)
+		return GenerationResult(
+			text=str(content),
+			model=str(data.get("model") or self._chat_model),
+			tokens_in=usage.get("prompt_tokens"),
+			tokens_out=usage.get("completion_tokens"),
+			latency_ms=latency_ms,
+		)
 
 	def embed(self, texts: List[str]) -> EmbeddingResult:
-		vectors = [[float(len(t))] * 3 for t in texts]
-		return EmbeddingResult(vectors=vectors)
+		if self._mock_mode:
+			return EmbeddingResult(vectors=self._mock_vectors(texts), model=self._embedding_model)
+
+		client = self._ensure_client()
+		payload = {"model": self._embedding_model, "input": texts}
+		try:
+			response = client.post(EMBEDDINGS_ENDPOINT, json=payload)
+			response.raise_for_status()
+		except httpx.HTTPError as exc:
+			raise ProviderCallError(f"openai embed error: {exc}") from exc
+
+		data = response.json()
+		vectors = [entry.get("embedding", []) for entry in data.get("data", [])]
+		if len(vectors) != len(texts):
+			raise ProviderCallError("openai embed error: mismatched vector count")
+
+		return EmbeddingResult(vectors=[list(map(float, vec)) for vec in vectors], model=str(data.get("model") or self._embedding_model))
 
 	def count_tokens(self, text: str) -> int:
 		return max(1, len(text) // 4)
 
+	def _mock_generation(self, prompt: str, start: float) -> GenerationResult:
+		text = f"[{self.name}-mock] {prompt}"
+		return GenerationResult(
+			text=text,
+			model=self._chat_model,
+			tokens_in=self.count_tokens(prompt),
+			tokens_out=self.count_tokens(text),
+			latency_ms=int((time.perf_counter() - start) * 1000),
+		)
 
+	def _mock_vectors(self, texts: List[str]) -> List[List[float]]:
+		return [[float(len(t)), float(len(t) % 7), float(len(t) % 13)] for t in texts]
+
+	def _ensure_client(self) -> httpx.Client:
+		if self._client is None:
+			raise ProviderCallError("openai client is not initialized")
+		return self._client

@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
-from controllers.api import app
+from controllers.api import create_app
 
 
-client = TestClient(app)
+client = TestClient(create_app())
 
 
 def test_block_jailbreak():

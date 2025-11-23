@@ -14,7 +14,7 @@ class AskResponse(BaseModel):
 	answer: str
 	citations: List[Dict[str, Any]]
 	plan: Dict[str, Any]
-	tool_result: Dict[str, Any] | None
+	tool_result: Dict[str, Any]
 	logs: List[str]
 
 

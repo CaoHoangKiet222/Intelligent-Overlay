@@ -35,6 +35,8 @@ class ProviderRegistry:
 				"cost_per_1k_tokens": provider.cost_per_1k_tokens,
 				"latency_ms_estimate": provider.latency_ms_estimate,
 				"context_window": provider.context_window,
+				"generation_model": provider.generation_model,
+				"embedding_model": provider.embedding_model,
 			}
 		return summary
 

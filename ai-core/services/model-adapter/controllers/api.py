@@ -46,6 +46,7 @@ class EmbedRequest(BaseModel):
 
 class EmbedResponse(BaseModel):
 	provider: str
+	model: str
 	vectors: List[List[float]]
 
 
@@ -89,8 +90,8 @@ def create_app() -> FastAPI:
 
 	@app.post("/embed", response_model=EmbedResponse)
 	def embed(req: EmbedRequest) -> EmbedResponse:
-		provider_name = req.model_hint or policy.default_embedding_provider()
-		vectors = gen_service.embed(provider_name, req.texts)
-		return EmbedResponse(provider=provider_name, vectors=vectors)
+		provider = policy.choose_provider_for_embedding(req.model_hint)
+		result = gen_service.embed(provider.name, req.texts)
+		return EmbedResponse(provider=provider.name, model=result.model, vectors=result.vectors)
 
 	return app
