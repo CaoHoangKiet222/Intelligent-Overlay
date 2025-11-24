@@ -252,6 +252,32 @@ services:
       timeout: 5s
       retries: 5
 
+  demo-api:
+    build:
+      context: ./ai-core/services/demo-api
+    container_name: ai_core_demo_api
+    environment:
+      PORT: 8000
+      MODEL_ADAPTER_BASE_URL: ${MODEL_ADAPTER_BASE_URL:-http://model-adapter:8000}
+      PROMPT_SERVICE_BASE_URL: ${PROMPT_SERVICE_BASE_URL:-http://prompt-service:8000}
+      RETRIEVAL_SERVICE_BASE_URL: ${RETRIEVAL_SERVICE_BASE_URL:-http://retrieval-service:8000}
+    depends_on:
+      prompt-service:
+        condition: service_healthy
+      retrieval-service:
+        condition: service_healthy
+      model-adapter:
+        condition: service_healthy
+    ports:
+      - "8090:8000"
+    networks:
+      - ai_core_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
   minio_data:

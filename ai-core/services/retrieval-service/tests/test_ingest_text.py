@@ -7,33 +7,61 @@ client = TestClient(app)
 
 
 @pytest.mark.parametrize("text", ["Hello world. This is a long text. " * 50])
-def test_ingest_text_ok(monkeypatch, text):
-	# stub embed_texts
+def test_normalize_and_index_ok(monkeypatch, text):
 	from clients import model_adapter as ma
+	from data import repositories as repo
+	from data import db as dbmod
+
 	async def fake_embed(texts):
 		return {"vectors": [[0.1, 0.2, 0.3] for _ in texts], "model": "stub", "dim": 3}
+
+	class FakeDoc:
+		def __init__(self):
+			self.id = "00000000-0000-0000-0000-000000000001"
+			self.locale = "vi"
+
+	class FakeSegment:
+		def __init__(self, idx):
+			self.id = f"seg-{idx}"
+			self.document_id = FakeDoc().id
+			self.text = f"chunk-{idx}"
+			self.start_offset = idx * 10
+			self.end_offset = idx * 10 + 5
+			self.page_no = None
+			self.paragraph_no = None
+			self.sentence_no = idx
+			self.speaker_label = None
+			self.timestamp_start_ms = None
+			self.timestamp_end_ms = None
+
+	class FakeSession:
+		async def __aenter__(self):
+			return self
+
+		async def __aexit__(self, *args):
+			return False
+
+		def begin(self):
+			class Tx:
+				async def __aenter__(self_inner):
+					return self_inner
+
+				async def __aexit__(self_inner, *args):
+					return False
+			return Tx()
+
 	monkeypatch.setattr(ma, "embed_texts", fake_embed)
+	monkeypatch.setattr(repo, "get_document_by_hash", lambda *args, **kwargs: None)
+	monkeypatch.setattr(repo, "create_document", lambda *args, **kwargs: FakeDoc())
+	monkeypatch.setattr(repo, "bulk_insert_segments", lambda *args, **kwargs: [FakeSegment(i) for i in range(3)])
+	monkeypatch.setattr(repo, "bulk_insert_embeddings", lambda *args, **kwargs: None)
+	monkeypatch.setattr(dbmod, "SessionLocal", lambda: FakeSession())
 
-	# stub DB ops to no-op
-	from data import repositories as repo
-	async def fake_create_document(s, payload):
-		class D:
-			id = "00000000-0000-0000-0000-000000000001"
-		return D()
-	async def fake_bulk_segments(s, doc_id, items):
-		class S:
-			def __init__(self, i): self.id = f"seg-{i}"
-		return [S(i) for i in range(len(items))]
-	async def fake_bulk_embeddings(s, pairs):
-		return None
-	monkeypatch.setattr(repo, "create_document", fake_create_document)
-	monkeypatch.setattr(repo, "bulk_insert_segments", fake_bulk_segments)
-	monkeypatch.setattr(repo, "bulk_insert_embeddings", fake_bulk_embeddings)
-
-	res = client.post("/ingest", data={"source_type": "text", "text": text})
+	res = client.post("/ingestion/normalize_and_index", json={"raw_text": text, "locale": "vi", "url": None})
 	assert res.status_code == 200
 	body = res.json()
-	assert body["segments_created"] > 1
-	assert body["dim"] == 3
+	assert body["context_id"]
+	assert body["chunk_count"] >= 1
+	assert len(body["segments"]) == 3
 
 

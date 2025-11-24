@@ -125,6 +125,10 @@ def test_create_and_get_with_cache_hits(monkeypatch):
 	# Second GET (hit)
 	res2 = awaitable_get(client, f"/prompts/{prompt_id}")
 	assert res2.status_code == 200
+	# GET by key
+	res3 = client.get(f"/prompts/by-key/k1")
+	assert res3.status_code == 200
+	assert res3.json()["prompt"]["key"] == "k1"
 
 	# metrics endpoint exists
 	met = client.get("/metrics")

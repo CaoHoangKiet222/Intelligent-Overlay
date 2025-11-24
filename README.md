@@ -41,6 +41,7 @@
 - Retrieval Service (FastAPI): `ai-core/services/retrieval-service` (POST /ingest, POST /search) - Port 8083
 - Agent Service (FastAPI + LangGraph): `ai-core/services/agent-service` (POST /agent/ask) - Port 8084
 - Orchestrator (Kafka + Ray + FastAPI): `ai-core/services/orchestrator` - Port 8085
+- Demo API (FastAPI): `ai-core/services/demo-api` (POST /demo/analyze, POST /demo/qa) - Port 8090
 
 Mỗi service có README riêng hướng dẫn chạy local và endpoints.
 

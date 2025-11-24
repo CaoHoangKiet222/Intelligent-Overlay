@@ -11,6 +11,31 @@ from metrics.prometheus import prompt_cache_hit, prompt_cache_miss, prompt_cache
 router = APIRouter(prefix="/prompts", tags=["prompts"])
 
 
+def _build_payload(pr, pv) -> Dict[str, Any]:
+	return {
+		"prompt": {
+			"id": str(pr.id),
+			"key": pr.key,
+			"name": pr.name,
+			"description": pr.description,
+			"tags": pr.tags,
+			"is_active": pr.is_active,
+			"created_at": pr.created_at.isoformat() if pr.created_at else None,
+			"updated_at": pr.updated_at.isoformat() if pr.updated_at else None,
+		},
+		"version": {
+			"id": str(pv.id),
+			"prompt_id": str(pr.id),
+			"version": pv.version,
+			"template": pv.template,
+			"variables": pv.variables or {},
+			"input_schema": pv.input_schema,
+			"output_schema": pv.output_schema,
+			"created_at": pv.created_at.isoformat() if pv.created_at else None,
+		},
+	}
+
+
 @router.post("", status_code=201)
 async def create_prompt(payload: PromptCreate, repo: PromptRepo = Depends(get_repo_dep)) -> Dict[str, Any]:
 	if await repo.get_prompt_by_key(payload.key):
@@ -53,29 +78,39 @@ async def get_prompt(prompt_id: str, version: Optional[int] = Query(default=None
 	if not pv:
 		raise HTTPException(status_code=404, detail="prompt version not found")
 
-	result: Dict[str, Any] = {
-		"prompt": {
-			"id": str(pr.id),
-			"key": pr.key,
-			"name": pr.name,
-			"description": pr.description,
-			"tags": pr.tags,
-			"is_active": pr.is_active,
-			"created_at": pr.created_at.isoformat() if pr.created_at else None,
-			"updated_at": pr.updated_at.isoformat() if pr.updated_at else None,
-		},
-		"version": {
-			"id": str(pv.id),
-			"prompt_id": str(pr.id),
-			"version": pv.version,
-			"template": pv.template,
-			"variables": pv.variables or {},
-			"input_schema": pv.input_schema,
-			"output_schema": pv.output_schema,
-			"created_at": pv.created_at.isoformat() if pv.created_at else None,
-		},
-	}
+	result = _build_payload(pr, pv)
 	await cache.set(prompt_id, version, result)
+	prompt_cache_miss.inc()
+	return result
+
+
+@router.get("/by-key/{prompt_key}")
+async def get_prompt_by_key(prompt_key: str, version: Optional[int] = Query(default=None),
+                            repo: PromptRepo = Depends(get_repo_dep),
+                            cache: PromptCache = Depends(get_cache_dep)) -> Dict[str, Any]:
+	pr = await repo.get_prompt_by_key(prompt_key)
+	if not pr:
+		raise HTTPException(status_code=404, detail="prompt not found")
+
+	prompt_id = str(pr.id)
+	target_version = version
+	if target_version is None:
+		pv = await repo.get_latest_version(prompt_id)
+		if not pv:
+			raise HTTPException(status_code=404, detail="prompt version not found")
+		target_version = pv.version
+	else:
+		pv = await repo.get_version(prompt_id, target_version)
+		if not pv:
+			raise HTTPException(status_code=404, detail="prompt version not found")
+
+	cached = await cache.get(prompt_id, target_version)
+	if cached:
+		prompt_cache_hit.inc()
+		return cached
+
+	result = _build_payload(pr, pv)
+	await cache.set(prompt_id, target_version, result)
 	prompt_cache_miss.inc()
 	return result
 

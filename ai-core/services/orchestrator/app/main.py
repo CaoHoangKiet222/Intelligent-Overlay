@@ -17,6 +17,8 @@ from data.repositories import LlmCallRepo, AnalysisRunRepo, IdempotencyRepo
 from orchestration.orchestrator_service import OrchestratorService
 from shared.telemetry.otel import init_otel
 from shared.telemetry.logger import setup_json_logger
+from routers.workers import router as workers_router
+from routers.orchestrators import router as orchestrator_router
 
 
 setup_json_logger()
@@ -51,6 +53,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="AI Core Orchestrator", version="0.1.0", lifespan=lifespan)
 app.mount("/metrics", metrics_app)
 init_otel(app)
+app.include_router(workers_router)
+app.include_router(orchestrator_router)
 
 
 @app.get("/healthz")

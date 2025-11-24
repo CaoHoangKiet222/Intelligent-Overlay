@@ -4,6 +4,7 @@ import time
 from typing import List
 
 import httpx
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from domain.errors import ProviderCallError
 from domain.models import EmbeddingResult, GenerationResult
@@ -68,8 +69,7 @@ class OpenAIProvider(BaseProvider):
 			"temperature": 0.2,
 		}
 		try:
-			response = client.post(CHAT_COMPLETIONS_ENDPOINT, json=payload)
-			response.raise_for_status()
+			response = self._post_with_retry(client, CHAT_COMPLETIONS_ENDPOINT, payload)
 		except httpx.HTTPError as exc:
 			raise ProviderCallError(f"openai chat error: {exc}") from exc
 
@@ -100,8 +100,7 @@ class OpenAIProvider(BaseProvider):
 		client = self._ensure_client()
 		payload = {"model": self._embedding_model, "input": texts}
 		try:
-			response = client.post(EMBEDDINGS_ENDPOINT, json=payload)
-			response.raise_for_status()
+			response = self._post_with_retry(client, EMBEDDINGS_ENDPOINT, payload)
 		except httpx.HTTPError as exc:
 			raise ProviderCallError(f"openai embed error: {exc}") from exc
 
@@ -132,3 +131,16 @@ class OpenAIProvider(BaseProvider):
 		if self._client is None:
 			raise ProviderCallError("openai client is not initialized")
 		return self._client
+
+	@staticmethod
+	@retry(
+		stop=stop_after_attempt(3),
+		wait=wait_exponential(min=0.5, max=4),
+		retry=retry_if_exception_type(httpx.HTTPError),
+	)
+	def _post_with_retry(client: httpx.Client, endpoint: str, payload: dict) -> httpx.Response:
+		response = client.post(endpoint, json=payload)
+		if response.status_code in (429, 500, 502, 503, 504):
+			raise httpx.HTTPStatusError("retryable error", request=response.request, response=response)
+		response.raise_for_status()
+		return response

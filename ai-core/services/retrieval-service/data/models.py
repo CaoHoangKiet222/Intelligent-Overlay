@@ -1,6 +1,7 @@
-from sqlalchemy import Column, String, Text, Integer, ForeignKey, CheckConstraint
-from sqlalchemy.dialects.postgresql import UUID, JSONB, TIMESTAMP
+from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 import uuid
 from .db import Base
 
@@ -41,7 +42,7 @@ class Embedding(Base):
 	model = Column(String(64), nullable=False)
 	dim = Column(Integer, nullable=False)
 	created_at = Column(TIMESTAMP(timezone=True))
-	# vector column created by migration; here omitted to avoid requiring pgvector dialect
+	vector = Column(Vector(1536), nullable=False)
 	__table_args__ = (CheckConstraint("dim > 0", name="ck_embeddings_dim_positive"),)
 
 

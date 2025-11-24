@@ -9,7 +9,16 @@ def test_ask_basic(monkeypatch):
 	# stub external calls to be fast
 	from clients import retrieval_service as rs
 	async def fake_search(query: str, top_k: int = 6):
-		return {"results": [{"segment_id": "s1", "text_preview": "hello world", "scores": {"hybrid": 0.9}}]}
+		return {
+			"results": [
+				{
+					"segment_id": "s1",
+					"text": "hello world",
+					"scores": {"hybrid": 0.9},
+					"span": {"segment_id": "s1", "start_offset": 0, "end_offset": 5},
+				}
+			]
+		}
 	monkeypatch.setattr(rs, "hybrid_search", fake_search)
 
 	from clients import model_adapter as ma

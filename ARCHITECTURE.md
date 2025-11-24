@@ -11,12 +11,15 @@
 
 ### Model Adapter
 
-- Vị trí: `ai-core/services/model-adapter`.
-- Cấu trúc: Entry point tại `app/main.py`, cấu hình tại `app/config.py`, controllers tại `controllers/api.py`.
-- Chức năng: trừu tượng hóa gọi LLM/embedding, áp dụng guardrails (PII masking, policy, system prompt), chọn nhà cung cấp theo chính sách routing.
-- Endpoint chính: `POST /generate`, `POST /embed`, `GET /providers`.
-- Tích hợp provider qua `providers/` (OpenAI, Anthropic, Mistral, Ollama) và điều phối bằng `routing/policy.py`.
-- Phụ thuộc: Redis (cache metadata), MinIO (lưu model artefacts nếu cần), thông số truy vết qua `shared/telemetry/*`.
+- Vị trí: `ai-core/services/model-adapter`, entry `app/main.py`, config `app/config.py`.
+- Endpoint chính (đã chuẩn hóa):
+  - `POST /model/generate`: nhận `prompt_ref` + `variables`, lấy template từ Prompt Service, chạy guardrails (PII masking, secret filter, jailbreak policy) rồi mới gọi provider.
+  - `POST /model/embed`: chuẩn hóa mọi embedding truy vấn.
+  - Giữ `/generate`, `/embed` cũ ở trạng thái deprecated cho client legacy, khuyến nghị chuyển sang `/model/*`.
+- Routing: `RouterPolicy` + `TASK_ROUTING` để map các tác vụ (`summary`, `qa` → OpenAI GPT-4o; `argument`, `logic_bias` → Anthropic Claude Sonnet nếu có key). Tự động fallback theo context window/cost/latency nếu không có cấu hình.
+- Guardrails: pipeline `guardrails/pipeline.py` mask email/phone, chặn token nhạy cảm (AWS key, private key, sk-*), prepend system prompt cứng.
+- Logging & metrics: ghi provider/model/tokens/latency/cost để theo dõi; retriable errors (429/5xx) được bọc tenacity tại provider (OpenAI/Anthropic...).
+- Tích hợp Prompt Service bắt buộc: mọi generation phải cung cấp `prompt_ref`.
 
 ### Prompt Service
 
@@ -38,18 +41,18 @@
 ### Agent Service
 
 - Vị trí: `ai-core/services/agent-service`.
-- Chức năng: triển khai tác nhân LangGraph gồm các nút policy guard, intake, retrieval, planner, tool call và fallback để trả lời câu hỏi người dùng.
-- Endpoint chính: `POST /agent/ask`.
-- Gọi `retrieval-service` để lấy ngữ cảnh, `model-adapter` để sinh phản hồi hoặc gọi tool theo kế hoạch, theo dõi fallback/tool error bằng Prometheus counter.
-- Định nghĩa state dùng Pydantic (`domain/state.py`), đồ thị trạng thái cấu hình tại `graph/build.py`.
+- Chức năng: tác nhân LangGraph (policy guard → intake → retrieval → planner → tool-call → answer/fallback) và một agent tối giản FR4.1 cho contextual Q&A.
+- Endpoint:
+  - `POST /agent/ask`: LangGraph đầy đủ.
+  - `POST /agent/qa`: pipeline guard → Retrieval Service hybrid search → Model Adapter (`task=qa`) với prompt RAG “trả lời chỉ dựa context”.
+- Tất cả prompts lấy từ Prompt Service, output chuẩn `{answer, citations[], confidence}`, dễ bổ sung tool mới (analysis bundle, external knowledge flag).
 
 ### Orchestrator
 
 - Vị trí: `ai-core/services/orchestrator`.
-- Cấu trúc: Entry point tại `app/main.py`, cấu hình tại `app/config.py`.
-- Chức năng: xử lý hàng loạt tác vụ phân tích (summary, argument, sentiment, logic bias). Tiêu thụ Kafka topic, phân tán công việc qua Ray, tổng hợp kết quả, quản lý idempotency và dead-letter queue.
-- Tích hợp với repository Postgres để lưu `analysis_runs` và `llm_calls`.
-- Worker Ray định nghĩa trong `workers/*`, aggregator tổng hợp trạng thái tại `orchestration/aggregator.py`.
+- Fan-out 4 worker (summary, argument, implication+sentiment, logic-bias) qua Ray, mỗi worker gọi Model Adapter bằng `task` riêng.
+- Aggregator lưu `analysis_runs` + `llm_calls`, quản lý idempotency, DLQ.
+- Realtime API mới `/orchestrator/analyze`: build `WorkerCall`, chạy RealtimeOrchestrator để fan-in/out async, trả `AnalysisBundleResponse` + `worker_statuses` (ok/error/timeout) hỗ trợ tương lai streaming.
 
 ## Luồng tương tác chính
 
@@ -176,7 +179,7 @@ sequenceDiagram
   DB-->>RT: segments + scores
   RT-->>AG: SearchResponse {results}
   AG->>AG: Planner → quyết định intent
-  AG->>MA: POST /generate {prompt,...}
+  AG->>MA: POST /model/generate {prompt_ref, variables, task=qa}
   MA->>LLM: route + guardrails + call
   LLM-->>MA: output
   MA-->>AG: {output}
@@ -230,9 +233,15 @@ service-name/
 - Orchestrator áp dụng idempotency và đẩy thông điệp vào DLQ khi fan-in thất bại.
 - Tests unit/functional sẵn có trong mỗi service: ví dụ `agent-service/tests/test_flow_basic.py`, `retrieval-service/tests/test_search_hybrid.py`.
 
-## Định hướng vận hành
+## Scripts tiện ích
 
-- Healthcheck chuẩn `/healthz` cho mỗi service, thuận tiện tích hợp load balancer và readiness probe.
-- Metric Prometheus hỗ trợ quan sát latency, lỗi tool, cache hit/miss, worker timeout.
-- Để mở trace, đặt `SERVICE_NAME` và `OTLP_ENDPOINT`, bật logger JSON để gửi tới Loki.
-- Pipeline CI/CD nên chạy `alembic upgrade head` cho từng service trước khi triển khai; Helm chart hỗ trợ cấu hình thông số tài nguyên và autoscaling.
+- `scripts/run_service.sh <service>`: khởi chạy nhanh từng service (agent, model-adapter, prompt-service, retrieval-service, orchestrator). Script tự cấu hình `.env` (MAP BASE_URL sang localhost) và log port (ví dụ `model-adapter` 8081).
+- `scripts/check_service.sh <service>`: gọi `curl` tới `/healthz` để xác thực service đang chạy.
+- `scripts/kill_service.sh <service>`: dừng tiến trình tương ứng (tmux + uvicorn) để giải phóng cổng.
+
+## Triển khai
+
+- **Local**: `docker-compose up` dựng đầy đủ Postgres, Redis, MinIO, Kafka, Ray + toàn bộ service. Chú ý export API keys trong `.env`.
+- **Helm/Kubernetes**: sử dụng chart `charts/aicore-app` (Deployment/Service/HPA/Ingress/ServiceMonitor). ArgoCD App-of-Apps tại `deploy/apps/app-of-apps.yaml` + giá trị môi trường `deploy/values/<env>`.
+- **Database migration**: chạy `alembic upgrade head` ở `ai-core/db` và từng service `data/migrations`.
+- **Observability**: bật `SERVICE_NAME`, `OTLP_ENDPOINT`, log JSON; Prometheus scrape `/metrics`.

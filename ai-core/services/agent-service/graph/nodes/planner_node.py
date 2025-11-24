@@ -6,7 +6,7 @@ from clients.model_adapter import llm_generate
 
 async def node_planner(state: AgentState) -> AgentState:
 	q = state.redacted_query or state.original_query
-	ctx = [r["text_preview"] for r in state.retrieved]
+	ctx = [r["text"] for r in state.retrieved]
 	prompt = build_planner_prompt(q, ctx)
 	out = await llm_generate(prompt=prompt, context="\n".join(ctx), language=state.language, model_hint="openai")
 	txt = (out.get("output") or "").strip()

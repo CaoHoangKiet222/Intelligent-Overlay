@@ -15,8 +15,9 @@ class RoutingCriteria:
 
 
 class RouterPolicy:
-	def __init__(self, registry: ProviderRegistry) -> None:
+	def __init__(self, registry: ProviderRegistry, task_routing: Optional[dict[str, str]] = None) -> None:
 		self._registry = registry
+		self._task_routing = {k.lower(): v for k, v in (task_routing or {}).items()}
 
 	def default_embedding_provider(self) -> str:
 		return "openai" if "openai" in self._registry.names() else self._registry.names()[0]
@@ -31,6 +32,15 @@ class RouterPolicy:
 				if provider.embedding_model.lower() == lowered:
 					return provider
 		return self._registry.get(self.default_embedding_provider())
+
+	def choose_provider_for_task(self, task: str, criteria: RoutingCriteria) -> Optional[BaseProvider]:
+		task_hint = self._task_routing.get(task.lower())
+		if task_hint:
+			try:
+				return self._registry.get(task_hint)
+			except KeyError:
+				pass
+		return self.choose_provider_for_generation(criteria)
 
 	def choose_provider_for_generation(self, criteria: RoutingCriteria) -> Optional[BaseProvider]:
 		if criteria.provider_hint:

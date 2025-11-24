@@ -29,6 +29,22 @@ Yêu cầu Kafka broker/Topic: `analysis.tasks`, `analysis.dlq`, và Postgres.
 
 ## Luồng xử lý
 
-- Consumer đọc message `AnalysisTask`
-- Ray tasks: summary, argument, sentiment, logic_bias (có retry nội bộ)
-- Fan-in: hợp nhất kết quả, lưu DB; partial nếu có lỗi cục bộ; failed ➜ DLQ
+1. **Kafka fan-out**  
+   - Consumer đọc `AnalysisTask` từ topic.  
+   - Ray chạy 4 worker song song (summary, argument, implication+sentiment, logic_bias); mỗi worker gọi Model Adapter bằng `prompt_ref` + `task` tương ứng.  
+   - Fan-in aggregate → Postgres (`analysis_runs`), ghi `llm_calls`, partial tolerant; lỗi toàn phần đẩy DLQ.
+
+2. **Realtime API**  
+   - `POST /orchestrator/analyze` body: `{context_id, language?, segments?, prompt_ids?}`  
+   - Service dựng `WorkerCall`, chạy `RealtimeOrchestrator` fan-out nội bộ (không Kafka) để trả ngay `AnalysisBundleResponse`:
+     ```json
+     {
+       "summary": {...},
+       "arguments": {...},
+       "implications": [...],
+       "sentiment": {...},
+       "logic_bias": {...},
+       "worker_statuses": {"summary": "ok", "argument": "error", ...}
+     }
+     ```
+   - Hữu ích cho demo UI muốn lấy toàn bộ bundle trong một request; thiết kế tương lai có thể stream khi từng worker xong.

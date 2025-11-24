@@ -27,7 +27,8 @@ Hybrid search (pgvector cosine + pg_trgm similarity), ingestion PDF/Text/Transcr
 ## Endpoints
 
 - `POST /ingest` (form/json): source_type=text|pdf|transcript
-- `POST /search` body: `{query, alpha?, top_k?, vec_k?, trgm_k?, filter_document_ids?}`
+- `POST /search` body: `{context_id?, query, alpha?, top_k?, vec_k?, trgm_k?, filter_document_ids?}`
+- Embedding mọi truy vấn thông qua `model-adapter` (`POST /model/embed`) → đảm bảo guardrails + routing thống nhất.
 
 ## DB Indexes
 

@@ -1,13 +1,16 @@
 from time import perf_counter
 import os
+import logging
 import uvicorn
 from fastapi import FastAPI, HTTPException
-from domain.schemas import AskRequest, AskResponse
+from domain.schemas import AskRequest, AskResponse, QaRequest, QaResponse
 from domain.state import AgentState
 from graph.build import build_graph
 from metrics.prometheus import metrics_app, latency, fallback_used, tool_errors
+from services.qa_agent import qa_agent_service
 
 
+logger = logging.getLogger(__name__)
 graph = build_graph()
 
 
@@ -39,6 +42,16 @@ def create_app() -> FastAPI:
 			logger.error(f"Error in ask: {e}")
 			raise HTTPException(status_code=500, detail=str(e))
 			
+
+	@application.post("/agent/qa", response_model=QaResponse)
+	async def agent_qa(req: QaRequest):
+		try:
+			return await qa_agent_service.answer(req)
+		except ValueError as exc:
+			raise HTTPException(status_code=400, detail=str(exc)) from exc
+		except Exception as exc:
+			logger.error("qa_error", exc_info=exc)
+			raise HTTPException(status_code=500, detail="qa_failed") from exc
 
 	@application.get("/healthz")
 	async def healthz():

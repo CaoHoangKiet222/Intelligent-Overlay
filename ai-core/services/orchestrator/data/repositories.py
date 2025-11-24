@@ -29,6 +29,9 @@ class LlmCallRepo:
 class AnalysisRunRepo:
 	async def upsert(self, task, agg) -> None:
 		async with SessionLocal() as s:
+			citations = None
+			if agg.citations:
+				citations = [span.model_dump(by_alias=True) for span in agg.citations]
 			obj = AnalysisRun(
 				event_id=task.event_id,
 				bundle_id=task.bundle_id,
@@ -37,7 +40,7 @@ class AnalysisRunRepo:
 				argument_json=agg.argument_json,
 				sentiment_json=agg.sentiment_json,
 				logic_bias_json=agg.logic_bias_json,
-				citations=agg.citations,
+				citations=citations,
 				error_summary=agg.error_summary,
 			)
 			s.add(obj)

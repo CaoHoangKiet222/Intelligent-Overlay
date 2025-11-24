@@ -11,6 +11,7 @@ get_service_port() {
 		"retrieval-service") echo "8083" ;;
 		"agent-service") echo "8084" ;;
 		"orchestrator") echo "8085" ;;
+		"demo-api") echo "8090" ;;
 		*) echo "" ;;
 	esac
 }
@@ -22,6 +23,7 @@ get_service_path() {
 		"retrieval-service") echo "ai-core/services/retrieval-service" ;;
 		"agent-service") echo "ai-core/services/agent-service" ;;
 		"orchestrator") echo "ai-core/services/orchestrator" ;;
+		"demo-api") echo "ai-core/services/demo-api" ;;
 		*) echo "" ;;
 	esac
 }
@@ -148,6 +150,7 @@ show_usage() {
 	echo "  retrieval-service (port 8083)"
 	echo "  agent-service (port 8084)"
 	echo "  orchestrator (port 8085)"
+	echo "  demo-api (port 8090)"
 	echo ""
 	echo "Environment:"
 	echo "  Script automatically loads .env file from service directory"

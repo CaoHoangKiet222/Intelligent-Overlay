@@ -5,7 +5,7 @@ from clients.model_adapter import llm_generate
 
 async def node_answer(state: AgentState) -> AgentState:
 	q = state.redacted_query or state.original_query
-	ctx = [r["text_preview"] for r in state.retrieved]
+	ctx = [r["text"] for r in state.retrieved]
 	tool_str = None
 	if state.tool_result:
 		if "data" in state.tool_result:

@@ -12,7 +12,7 @@ class GenerationService:
 		self._registry = registry
 		self._policy = policy
 
-	def generate(self, provider_name: str, prompt: str) -> str:
+	def generate(self, provider_name: str, prompt: str) -> GenerationResult:
 		provider = self._registry.get(provider_name)
 		start = time.perf_counter()
 		result = provider.generate(prompt)
@@ -21,7 +21,13 @@ class GenerationService:
 		tokens_out = result.tokens_out if result.tokens_out is not None else provider.count_tokens(result.text)
 		model_name = result.model or provider.generation_model
 		llm_usage(provider=provider.name, model=model_name, tokens_in=tokens_in, tokens_out=tokens_out, latency_ms=latency_ms)
-		return result.text
+		return GenerationResult(
+			text=result.text,
+			model=model_name,
+			tokens_in=tokens_in,
+			tokens_out=tokens_out,
+			latency_ms=latency_ms,
+		)
 
 	def embed(self, provider_name: str, texts: List[str]) -> EmbeddingResult:
 		provider = self._registry.get(provider_name)

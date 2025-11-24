@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
+from shared.contracts import SpanRef
 
 
 class AgentState(BaseModel):
@@ -10,7 +11,7 @@ class AgentState(BaseModel):
 	redacted_query: Optional[str] = None
 	guard_flags: Dict[str, Any] = Field(default_factory=dict)
 	retrieved: List[Dict[str, Any]] = Field(default_factory=list)
-	citations: List[Dict[str, Any]] = Field(default_factory=list)
+	citations: List[SpanRef] = Field(default_factory=list)
 	plan: Dict[str, Any] = Field(default_factory=dict)
 	tool_result: Optional[Dict[str, Any]] = None
 	answer: Optional[str] = None

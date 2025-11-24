@@ -1,6 +1,7 @@
-# Agent Service (LangGraph)
+# Agent Service
 
-Pipeline: policy_guard → intake → retrieval → planner → tool_call → answer → fallback.
+- LangGraph pipeline: `policy_guard → intake → retrieval → planner → tool_call → answer → fallback`.
+- Realtime QA pipeline (FR4.1): guard query → Retrieval Service hybrid search → Model Adapter (prompt RAG) → trả `{answer, citations, confidence}`.
 
 ## Mục đích
 
@@ -26,10 +27,10 @@ Pipeline: policy_guard → intake → retrieval → planner → tool_call → an
 
 ## Endpoint
 
-- `POST /agent/ask` body: `{query, session_id?, language?, meta?}`
-- Kết quả: `{answer, citations, plan, tool_result, logs}`
+- `POST /agent/ask` body: `{query, session_id?, language?, meta?}` → trả `{answer, citations, plan, tool_result, logs}` (LangGraph đầy đủ).
+- `POST /agent/qa` body: `{context_id, query, conversation_id?, language?}` → trả `{answer, citations[], confidence, conversation_id}`. Phù hợp cho contextual Q&A hiển thị trong overlay demo.
 
-### Ví dụ curl
+### Ví dụ curl: LangGraph
 
 ```bash
 curl -X POST http://localhost:8000/agent/ask \
@@ -45,12 +46,27 @@ curl -X POST http://localhost:8000/agent/ask \
   }'
 ```
 
-Ví dụ tối giản (chỉ có query bắt buộc):
+### Ví dụ curl: Q&A contextual
 
 ```bash
-curl -X POST http://localhost:8000/agent/ask \
+curl -X POST http://localhost:8000/agent/qa \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "What is the weather today?"
+    "context_id": "ctx-demo-001",
+    "query": "Overlay giảm latency thế nào?",
+    "conversation_id": "conv-42",
+    "language": "vi"
   }'
+```
+
+Kết quả mẫu:
+```json
+{
+  "conversation_id": "conv-42",
+  "answer": "Overlay thêm caching tại edge nên latency giảm ~18% [seg:chunk-01].",
+  "citations": [
+    {"segment_id": "chunk-01", "start_offset": 120, "end_offset": 185, "text_preview": "..."}
+  ],
+  "confidence": 0.78
+}
 ```

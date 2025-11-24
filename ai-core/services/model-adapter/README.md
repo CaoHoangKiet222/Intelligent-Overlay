@@ -34,8 +34,35 @@ FastAPI service trừu tượng hoá đa LLM (Adapter + RouterPolicy), có Guard
 
 - `GET /healthz`
 - `GET /providers`
-- `POST /generate` body: `{prompt, language?, context_len?, cost_target?, latency_target_ms?, provider_hint?}`
-- `POST /embed` body: `{texts, model_hint?}` (`model_hint` có thể là tên provider hoặc tên embedding model cụ thể)
+- `POST /model/generate` body:
+  ```json
+  {
+    "prompt_ref": "key:demo.summary.v1",
+    "variables": {"context": "...", "seeds": "..."},
+    "task": "summary",
+    "language": "vi",
+    "provider_hint": "openai?"
+  }
+  ```
+  Trả `{provider, model, output, tokens_in, tokens_out, latency_ms, cost_usd}`. Prompt được lấy từ Prompt Service theo `prompt_ref`, guardrails áp dụng trước khi gọi vendor.
+- `POST /model/embed` body: `{ "texts": [...], "model_hint": "openai" }`
+- Legacy (deprecated): `/generate`, `/embed` – chỉ dùng khi chưa chuyển kịp.
+
+Ví dụ nhanh:
+```bash
+curl -X POST http://localhost:8081/model/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt_ref": "key:demo.qa.v1",
+    "variables": {
+      "query": "Overlay giảm latency thế nào?",
+      "context": "[seg:1] ...",
+      "instructions": "Chỉ trả lời dựa vào ngữ cảnh."
+    },
+    "task": "qa",
+    "language": "vi"
+  }'
+```
 
 ## Metrics/Tracing
 
