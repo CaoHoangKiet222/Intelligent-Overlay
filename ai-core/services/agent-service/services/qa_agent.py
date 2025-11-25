@@ -8,6 +8,7 @@ from shared.contracts import SpanRef
 from domain.schemas import QaRequest, QaResponse
 from clients.model_adapter import llm_generate
 from clients.retrieval_service import search_context_spans
+from services.qa_utils import estimate_confidence
 
 QA_PROMPT_REF = os.getenv("QA_PROMPT_REF", "key:demo.qa.v1")
 QA_MODEL_HINT = os.getenv("QA_MODEL_HINT", "openai")
@@ -61,7 +62,7 @@ class QaAgentService:
 		answer = str(llm_resp.get("output") or "").strip()
 		if not answer:
 			answer = "Tôi không chắc về câu trả lời dựa trên dữ liệu hiện có."
-		confidence = _estimate_confidence(results, answer)
+		confidence = estimate_confidence(results, answer)
 		return QaResponse(
 			conversation_id=request.conversation_id,
 			answer=answer,
@@ -100,25 +101,4 @@ def _spans_from_results(results: Sequence[dict]) -> List[SpanRef]:
 	return citations[:QA_TOP_K]
 
 
-def _estimate_confidence(results: Sequence[dict], answer: str) -> float:
-	if not results:
-		return 0.3
-	top_score = 0.0
-	for item in results:
-		score = item.get("score")
-		if score is None:
-			span = item.get("span") or {}
-			score = span.get("score")
-		if score:
-			top_score = max(top_score, float(score))
-	base = 0.55 + 0.08 * min(len(results), 3)
-	if top_score:
-		base += 0.1 * min(top_score, 1.0)
-	lower = answer.lower()
-	if "không chắc" in lower or "does not know" in lower:
-		base = min(base, 0.5)
-	return round(min(0.95, base), 2)
-
-
 qa_agent_service = QaAgentService()
-

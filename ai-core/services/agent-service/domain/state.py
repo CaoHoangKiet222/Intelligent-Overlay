@@ -8,6 +8,9 @@ class AgentState(BaseModel):
 	original_query: str
 	language: str = "auto"
 	meta: Dict[str, Any] = Field(default_factory=dict)
+	context_id: Optional[str] = None
+	allow_external: bool = False
+	used_external: bool = False
 	redacted_query: Optional[str] = None
 	guard_flags: Dict[str, Any] = Field(default_factory=dict)
 	retrieved: List[Dict[str, Any]] = Field(default_factory=list)

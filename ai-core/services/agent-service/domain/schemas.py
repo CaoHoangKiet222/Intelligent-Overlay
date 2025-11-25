@@ -24,6 +24,7 @@ class QaRequest(BaseModel):
 	query: str = Field(min_length=1, max_length=1024)
 	conversation_id: Optional[str] = None
 	language: str = "auto"
+	allow_external: bool = False
 
 
 class QaResponse(BaseModel):
@@ -31,22 +32,6 @@ class QaResponse(BaseModel):
 	answer: str
 	citations: List[SpanRef] = Field(default_factory=list)
 	confidence: float = Field(ge=0.0, le=1.0)
-from shared.contracts import SpanRef
-
-
-class AskRequest(BaseModel):
-	query: str
-	session_id: Optional[str] = None
-	language: str = "auto"
-	meta: Dict[str, Any] = {}
-
-
-class AskResponse(BaseModel):
-	session_id: Optional[str]
-	answer: str
-	citations: List[SpanRef]
-	plan: Dict[str, Any]
-	tool_result: Dict[str, Any]
-	logs: List[str]
+	used_external: bool = False
 
 

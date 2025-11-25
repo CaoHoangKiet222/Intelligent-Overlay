@@ -6,17 +6,36 @@ import httpx
 BASE = os.getenv("MODEL_ADAPTER_BASE_URL", "http://model-adapter:8000").rstrip("/")
 
 
-async def llm_generate(prompt_ref: str, variables: Dict[str, Any], language: str, task: str, model_hint: Optional[str] = None) -> Dict[str, Any]:
-	payload: Dict[str, Any] = {
-		"prompt_ref": prompt_ref,
-		"variables": variables,
-		"language": language,
-		"task": task,
-	}
-	if model_hint:
-		payload["provider_hint"] = model_hint
+async def llm_generate(
+	*,
+	prompt_ref: str | None = None,
+	variables: Dict[str, Any] | None = None,
+	language: str = "auto",
+	task: str = "default",
+	model_hint: Optional[str] = None,
+	prompt: str | None = None,
+	context: str | None = None,
+) -> Dict[str, Any]:
 	async with httpx.AsyncClient(timeout=30.0) as client:
-		r = await client.post(f"{BASE}/model/generate", json=payload)
+		if prompt_ref:
+			payload: Dict[str, Any] = {
+				"prompt_ref": prompt_ref,
+				"variables": variables or {},
+				"language": language,
+				"task": task,
+			}
+			if model_hint:
+				payload["provider_hint"] = model_hint
+			r = await client.post(f"{BASE}/model/generate", json=payload)
+		else:
+			payload = {
+				"prompt": prompt or "",
+				"language": language,
+				"provider_hint": model_hint,
+			}
+			if context is not None:
+				payload["context"] = context
+			r = await client.post(f"{BASE}/generate", json=payload)
 		r.raise_for_status()
 		return r.json()
 
