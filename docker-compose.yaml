@@ -128,7 +128,7 @@ services:
 
   model-adapter:
     build:
-      context: ./ai-core/services/model-adapter
+      context: ./ai-core
     container_name: ai_core_model_adapter
     environment:
       PORT: 8000
@@ -157,7 +157,7 @@ services:
 
   prompt-service:
     build:
-      context: ./ai-core/services/prompt-service
+      context: ./ai-core
     container_name: ai_core_prompt_service
     environment:
       PORT: 8000
@@ -177,7 +177,7 @@ services:
 
   retrieval-service:
     build:
-      context: ./ai-core/services/retrieval-service
+      context: ./ai-core
     container_name: ai_core_retrieval_service
     environment:
       PORT: 8000
@@ -197,7 +197,7 @@ services:
 
   agent-service:
     build:
-      context: ./ai-core/services/agent-service
+      context: ./ai-core
     container_name: ai_core_agent_service
     environment:
       PORT: 8000
@@ -220,7 +220,7 @@ services:
 
   orchestrator:
     build:
-      context: ./ai-core/services/orchestrator
+      context: ./ai-core
     container_name: ai_core_orchestrator
     environment:
       PORT: 8000
@@ -254,7 +254,7 @@ services:
 
   demo-api:
     build:
-      context: ./ai-core/services/demo-api
+      context: ./ai-core
     container_name: ai_core_demo_api
     environment:
       PORT: 8000

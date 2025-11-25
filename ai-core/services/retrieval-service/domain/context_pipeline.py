@@ -12,6 +12,7 @@ from data.repositories import (
 	get_document_by_hash,
 	list_segments_by_document,
 )
+from app.config import EMBEDDING_DIM
 from domain.segmentation import segment_text
 
 
@@ -111,22 +112,33 @@ class NormalizeAndIndexService:
 	async def _embed_chunks(self, texts: Sequence[str]) -> Tuple[List[List[float]], str, int]:
 		vectors: List[List[float]] = []
 		model_name: str | None = None
-		dimension: int | None = None
+		dimension: int | None = EMBEDDING_DIM
 		for batch in _batched(texts, self._embed_batch):
 			if not batch:
 				continue
 			resp = await embed_texts(list(batch))
-			batch_vectors = resp.get("vectors") or []
+			batch_vectors_raw = resp.get("vectors") or []
+			batch_vectors = [self._coerce_vector(vec) for vec in batch_vectors_raw]
 			if not batch_vectors:
 				raise ValueError("embedding_vectors_missing")
 			vectors.extend(batch_vectors)
 			model_name = resp.get("model", model_name)
-			dimension = resp.get("dim", dimension)
+			dimension = EMBEDDING_DIM
 		if len(vectors) != len(texts):
 			raise ValueError("embedding_count_mismatch")
 		if model_name is None or dimension is None:
 			raise ValueError("embedding_metadata_missing")
 		return vectors, model_name, dimension
+
+	@staticmethod
+	def _coerce_vector(vector: Sequence[float]) -> List[float]:
+		float_vec = [float(v) for v in vector]
+		if len(float_vec) == EMBEDDING_DIM:
+			return float_vec
+		if len(float_vec) > EMBEDDING_DIM:
+			return float_vec[:EMBEDDING_DIM]
+		padding = [0.0] * (EMBEDDING_DIM - len(float_vec))
+		return float_vec + padding
 
 
 def _batched(items: Sequence[str], size: int) -> Iterable[Sequence[str]]:

@@ -2,6 +2,7 @@ from typing import Dict, List
 
 from domain.models import EmbeddingResult, GenerationResult
 from providers.base import BaseProvider
+from providers.mock_embeddings import build_mock_embeddings, DEFAULT_MOCK_EMBED_DIM
 from providers.registry import ProviderRegistry
 from routing.policy import RouterPolicy
 
@@ -40,7 +41,12 @@ class DummyProvider(BaseProvider):
 		return GenerationResult(text=f"{self._name}:{prompt}", model=self._generation_model, tokens_in=1, tokens_out=1, latency_ms=1)
 
 	def embed(self, texts: List[str]) -> EmbeddingResult:
-		return EmbeddingResult(vectors=[[1.0] * 3 for _ in texts], model=self._embedding_model)
+		vectors = build_mock_embeddings(texts)
+		return EmbeddingResult(
+			vectors=vectors,
+			model=self._embedding_model,
+			dim=DEFAULT_MOCK_EMBED_DIM if vectors else 0,
+		)
 
 	def count_tokens(self, text: str) -> int:
 		return max(1, len(text))

@@ -9,6 +9,8 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from domain.errors import ProviderCallError
 from domain.models import EmbeddingResult, GenerationResult
 from providers.base import BaseProvider
+from providers.mock_embeddings import build_mock_embeddings, DEFAULT_MOCK_EMBED_DIM
+from providers.mock_generation import generate_mock_output
 
 CHAT_COMPLETIONS_ENDPOINT = "/chat/completions"
 EMBEDDINGS_ENDPOINT = "/embeddings"
@@ -95,7 +97,12 @@ class OpenAIProvider(BaseProvider):
 
 	def embed(self, texts: List[str]) -> EmbeddingResult:
 		if self._mock_mode:
-			return EmbeddingResult(vectors=self._mock_vectors(texts), model=self._embedding_model)
+			mock_vectors = build_mock_embeddings(texts)
+			return EmbeddingResult(
+				vectors=mock_vectors,
+				model=self._embedding_model,
+				dim=DEFAULT_MOCK_EMBED_DIM if mock_vectors else 0,
+			)
 
 		client = self._ensure_client()
 		payload = {"model": self._embedding_model, "input": texts}
@@ -109,13 +116,15 @@ class OpenAIProvider(BaseProvider):
 		if len(vectors) != len(texts):
 			raise ProviderCallError("openai embed error: mismatched vector count")
 
-		return EmbeddingResult(vectors=[list(map(float, vec)) for vec in vectors], model=str(data.get("model") or self._embedding_model))
+		float_vectors = [list(map(float, vec)) for vec in vectors]
+		dim = len(float_vectors[0]) if float_vectors else 0
+		return EmbeddingResult(vectors=float_vectors, model=str(data.get("model") or self._embedding_model), dim=dim)
 
 	def count_tokens(self, text: str) -> int:
 		return max(1, len(text) // 4)
 
 	def _mock_generation(self, prompt: str, start: float) -> GenerationResult:
-		text = f"[{self.name}-mock] {prompt}"
+		text = generate_mock_output(self.name, prompt)
 		return GenerationResult(
 			text=text,
 			model=self._chat_model,
@@ -123,9 +132,6 @@ class OpenAIProvider(BaseProvider):
 			tokens_out=self.count_tokens(text),
 			latency_ms=int((time.perf_counter() - start) * 1000),
 		)
-
-	def _mock_vectors(self, texts: List[str]) -> List[List[float]]:
-		return [[float(len(t)), float(len(t) % 7), float(len(t) % 13)] for t in texts]
 
 	def _ensure_client(self) -> httpx.Client:
 		if self._client is None:

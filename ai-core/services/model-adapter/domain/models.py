@@ -15,5 +15,6 @@ class GenerationResult:
 class EmbeddingResult:
 	vectors: List[List[float]]
 	model: str
+	dim: int | None = None
 
 

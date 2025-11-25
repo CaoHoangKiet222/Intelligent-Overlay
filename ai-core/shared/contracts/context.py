@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field, ConfigDict, PrivateAttr, field_validator
+from pydantic import ValidationInfo
 
 
 class SpanRef(BaseModel):
@@ -39,8 +40,8 @@ class ContextChunk(BaseModel):
 
 	@field_validator("end_offset")
 	@classmethod
-	def _validate_offsets(cls, end: Optional[int], values: Dict[str, Any]):
-		start = values.get("start_offset")
+	def _validate_offsets(cls, end: Optional[int], info: ValidationInfo):
+		start = info.data.get("start_offset") if info.data else None
 		if end is not None and start is not None and end < start:
 			raise ValueError("end_offset must be >= start_offset")
 		return end

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Boolean, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Text, Boolean, Integer, ForeignKey, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB, TIMESTAMP
 from sqlalchemy.orm import relationship
 import uuid
@@ -14,8 +14,19 @@ class Prompt(Base):
 	tags = Column(JSONB)
 	is_active = Column(Boolean, default=True, nullable=False)
 	created_by = Column(UUID(as_uuid=True))
-	created_at = Column(TIMESTAMP(timezone=True))
-	updated_at = Column(TIMESTAMP(timezone=True))
+	created_at = Column(
+		TIMESTAMP(timezone=True),
+		nullable=False,
+		default=func.now(),
+		server_default=func.now(),
+	)
+	updated_at = Column(
+		TIMESTAMP(timezone=True),
+		nullable=False,
+		default=func.now(),
+		server_default=func.now(),
+		onupdate=func.now(),
+	)
 	versions = relationship("PromptVersion", backref="prompt", lazy="raise")
 
 
@@ -30,7 +41,12 @@ class PromptVersion(Base):
 	output_schema = Column(JSONB)
 	notes = Column(Text)
 	created_by = Column(UUID(as_uuid=True))
-	created_at = Column(TIMESTAMP(timezone=True))
+	created_at = Column(
+		TIMESTAMP(timezone=True),
+		nullable=False,
+		default=func.now(),
+		server_default=func.now(),
+	)
 	__table_args__ = (UniqueConstraint("prompt_id", "version", name="uq_prompt_version"),)
 
 

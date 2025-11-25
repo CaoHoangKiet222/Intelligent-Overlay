@@ -2,7 +2,8 @@ import uuid
 from typing import Any, Mapping, Sequence
 from fastapi import APIRouter, HTTPException, Query, status
 from time import perf_counter
-from sqlalchemy import text as sql
+from sqlalchemy import bindparam, text as sql
+from pgvector.sqlalchemy import Vector
 from domain.schemas import (
 	RetrievalMode,
 	RetrievalSearchRequest,
@@ -18,6 +19,7 @@ from data.repositories import get_document_by_id, list_segments_by_document
 from clients.model_adapter import embed_texts
 from metrics.prometheus import observe_latency, vec_candidates, trgm_candidates
 from domain.context_pipeline import segment_to_chunk
+from app.config import EMBEDDING_DIM
 
 
 router = APIRouter(prefix="/retrieval", tags=["retrieval"])
@@ -29,6 +31,8 @@ WHERE s.document_id = :document_id
 ORDER BY s.start_offset
 LIMIT :limit
 """
+_VECTOR_SQL_STMT = sql(VECTOR_SQL).bindparams(bindparam("qvec", type_=Vector(EMBEDDING_DIM)))
+_HYBRID_SQL_STMT = sql(HYBRID_SQL).bindparams(bindparam("qvec", type_=Vector(EMBEDDING_DIM)))
 
 
 @router.get("/context/{context_id}", response_model=ContextDetailResponse, summary="Fetch context chunks by id")
@@ -98,32 +102,38 @@ async def search(payload: RetrievalSearchRequest):
 
 
 async def _run_vector(session, context_id: uuid.UUID, query_vector: Sequence[float], limit: int):
-	rows = (
+	raw_rows = (
 		await session.execute(
-			sql(VECTOR_SQL),
-			{"document_id": context_id, "qvec": query_vector, "limit": max(limit * 4, limit)},
+			_VECTOR_SQL_STMT,
+			{"document_id": context_id, "qvec": list(query_vector), "limit": max(limit * 4, limit)},
 		)
 	).mappings().all()
-	for row in rows:
-		row["score"] = float(row["vscore"])
-		row["breakdown"] = {"vector": row["score"]}
+	rows = []
+	for row in raw_rows:
+		data = dict(row)
+		data["score"] = float(data["vscore"])
+		data["breakdown"] = {"vector": data["score"]}
+		rows.append(data)
 	return rows
 
 
 async def _run_lexical(session, context_id: uuid.UUID, query: str, limit: int):
-	rows = (
+	raw_rows = (
 		await session.execute(
 			sql(LEXICAL_SQL),
 			{"document_id": context_id, "query": query, "limit": max(limit * 4, limit)},
 		)
 	).mappings().all()
-	if not rows:
-		rows = (
+	if not raw_rows:
+		raw_rows = (
 			await session.execute(sql(FALLBACK_SEGMENTS_SQL), {"document_id": context_id, "limit": limit})
 		).mappings().all()
-	for row in rows:
-		row["score"] = float(row.get("tscore") or 0.0)
-		row["breakdown"] = {"lexical": row["score"]}
+	rows = []
+	for row in raw_rows:
+		data = dict(row)
+		data["score"] = float(data.get("tscore") or 0.0)
+		data["breakdown"] = {"lexical": data["score"]}
+		rows.append(data)
 	return rows
 
 
@@ -137,13 +147,17 @@ async def _run_hybrid(session, context_id: uuid.UUID, payload: RetrievalSearchRe
 		"trgm_k": max(payload.top_k * 4, payload.top_k),
 		"top_k": payload.top_k,
 	}
-	rows = (await session.execute(sql(HYBRID_SQL), params)).mappings().all()
-	for row in rows:
-		row["score"] = float(row["hybrid"])
-		row["breakdown"] = {
-			"vector": float(row.get("vscore") or 0.0),
-			"lexical": float(row.get("tscore") or 0.0),
+	params["qvec"] = list(query_vector)
+	raw_rows = (await session.execute(_HYBRID_SQL_STMT, params)).mappings().all()
+	rows = []
+	for row in raw_rows:
+		data = dict(row)
+		data["score"] = float(data["hybrid"])
+		data["breakdown"] = {
+			"vector": float(data.get("vscore") or 0.0),
+			"lexical": float(data.get("tscore") or 0.0),
 		}
+		rows.append(data)
 	return rows
 
 

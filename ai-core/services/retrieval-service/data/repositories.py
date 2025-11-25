@@ -1,10 +1,16 @@
 from typing import Any, Dict, List, Optional
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from .models import Document, Segment, Embedding
+from .models import Document, Segment, Embedding, SourceType
 
 
 async def create_document(s: AsyncSession, payload: Dict[str, Any]) -> Document:
+	source_type = payload.get("source_type")
+	if isinstance(source_type, str):
+		try:
+			payload["source_type"] = SourceType(source_type.lower())
+		except ValueError:
+			payload["source_type"] = SourceType.TEXT
 	doc = Document(**payload)
 	s.add(doc)
 	await s.flush()

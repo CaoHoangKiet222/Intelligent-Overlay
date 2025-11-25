@@ -11,7 +11,8 @@ except Exception:
 def _build_analyzer():
 	if not _PRESIDIO_AVAILABLE:
 		return None
-	nlp_engine = SpacyNlpEngine(models={"en": "en_core_web_sm"})
+	models_config = [{"lang_code": "en", "model_name": "en_core_web_sm"}]
+	nlp_engine = SpacyNlpEngine(models=models_config)
 	registry = RecognizerRegistry()
 	registry.load_predefined_recognizers()
 	vn_phone_pattern = Pattern("VN_PHONE", r"(?:\\+?84|0)(?:\\s|-)?[1-9]\\d{1}(?:\\s|-)?\\d{3}(?:\\s|-)?\\d{4}", 0.5)

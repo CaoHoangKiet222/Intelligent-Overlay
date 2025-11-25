@@ -8,7 +8,7 @@ if str(ai_core_path) not in sys.path:
 
 import logging
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Dict, Optional, Any, Literal
 
 from app.config import AppConfig
@@ -58,11 +58,13 @@ class LegacyGenerateRequest(BaseModel):
 class EmbedRequest(BaseModel):
 	texts: List[str]
 	model_hint: Optional[str] = None
+	model_config = ConfigDict(protected_namespaces=())
 
 
 class EmbedResponse(BaseModel):
 	provider: str
 	model: str
+	dim: int
 	vectors: List[List[float]]
 
 
@@ -138,7 +140,8 @@ def create_app() -> FastAPI:
 	def model_embed(req: EmbedRequest) -> EmbedResponse:
 		provider = policy.choose_provider_for_embedding(req.model_hint)
 		result = gen_service.embed(provider.name, req.texts)
-		return EmbedResponse(provider=provider.name, model=result.model, vectors=result.vectors)
+		dim = result.dim if result.dim is not None else (len(result.vectors[0]) if result.vectors else 0)
+		return EmbedResponse(provider=provider.name, model=result.model, dim=dim, vectors=result.vectors)
 
 	@app.post("/embed", response_model=EmbedResponse, deprecated=True)
 	def legacy_embed(req: EmbedRequest) -> EmbedResponse:

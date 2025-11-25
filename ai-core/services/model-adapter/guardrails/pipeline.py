@@ -3,7 +3,7 @@ from fastapi import HTTPException, status
 from .presidio_engine import redact
 from .policy import run_policy
 from .system_prompt import HARD_SYSTEM_PROMPT
-from ..metrics.prometheus import guard_pii_masked, guard_blocked, guard_jailbreak
+from metrics.prometheus import guard_pii_masked, guard_blocked, guard_jailbreak
 import re
 
 SENSITIVE_PATTERNS = [

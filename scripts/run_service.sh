@@ -36,7 +36,7 @@ run_service() {
 	local service_path=$(get_service_path "$service_name")
 	if [ -z "$service_path" ]; then
 		echo "✗ Unknown service: $service_name"
-		echo "Available services: model-adapter, prompt-service, retrieval-service, agent-service, orchestrator"
+		echo "Available services: model-adapter, prompt-service, retrieval-service, agent-service, orchestrator, demo-api"
 		return 1
 	fi
 	
@@ -119,6 +119,7 @@ run_service() {
 	fi
 	
 	export PORT=$port
+	export PYTHONPATH="$project_root/ai-core:$PYTHONPATH"
 	
 	if [ "$mode" = "background" ]; then
 		echo "→ Starting $service_name on port $port (background mode)..."

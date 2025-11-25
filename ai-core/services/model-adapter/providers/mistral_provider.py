@@ -1,6 +1,8 @@
 from typing import List
 from domain.models import GenerationResult, EmbeddingResult
 from providers.base import BaseProvider
+from providers.mock_embeddings import build_mock_embeddings, DEFAULT_MOCK_EMBED_DIM
+from providers.mock_generation import generate_mock_output
 
 
 class MistralProvider(BaseProvider):
@@ -34,7 +36,7 @@ class MistralProvider(BaseProvider):
 		return self._embedding_model
 
 	def generate(self, prompt: str) -> GenerationResult:
-		text = f"[mistral-mock] {prompt}"
+		text = generate_mock_output(self.name, prompt)
 		return GenerationResult(
 			text=text,
 			model=self._generation_model,
@@ -44,8 +46,12 @@ class MistralProvider(BaseProvider):
 		)
 
 	def embed(self, texts: List[str]) -> EmbeddingResult:
-		vectors = [[float(len(t))] * 3 for t in texts]
-		return EmbeddingResult(vectors=vectors, model=self._embedding_model)
+		vectors = build_mock_embeddings(texts)
+		return EmbeddingResult(
+			vectors=vectors,
+			model=self._embedding_model,
+			dim=DEFAULT_MOCK_EMBED_DIM if vectors else 0,
+		)
 
 	def count_tokens(self, text: str) -> int:
 		return max(1, len(text) // 4)

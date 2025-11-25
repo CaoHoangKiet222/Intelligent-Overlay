@@ -48,3 +48,28 @@ uvicorn app.main:app --reload --port 8090
 - Chưa có auth/throttling.
 - QA mới chỉ RAG nội bộ, chưa hỗ trợ conversation state/FR4.2.
 - Prompt Service bắt buộc chạy vì demo sẽ auto bootstrap các prompt mặc định (key `demo.*`).
+
+### Ví dụ cURL cho đội QC
+
+1. Tạo context mới từ transcript kiểm thử nội bộ:
+
+```bash
+curl -X POST http://localhost:8090/demo/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "raw_text": "Meeting QA 2025-11-25:\n- Tester A phát hiện crash khi nhập \"@@@\" vào form.\n- Tester B cần model tóm tắt rõ severity và bước tái hiện.\n- Kỳ vọng đưa ra khuyến nghị fix trước release cuối tuần.",
+    "url": "https://confluence.example.com/qc/meeting-2025-11-25",
+    "locale": "vi"
+  }'
+```
+
+2. Đặt câu hỏi chất lượng dựa trên `context_id` vừa trả về:
+
+```bash
+curl -X POST http://localhost:8090/demo/qa \
+  -H "Content-Type: application/json" \
+  -d '{
+    "context_id": "0a9d1886-b8e0-4c1a-aa18-b1dd6a45b2db",
+    "query": "Tổng hợp các lỗi blocker mà QA yêu cầu phải sửa trước khi phát hành?"
+  }'
+```

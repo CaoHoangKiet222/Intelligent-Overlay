@@ -36,7 +36,7 @@ LIMIT :limit
 
 HYBRID_SQL = """
 WITH q AS (
-  SELECT :query::text AS qstr, :alpha::float AS alpha
+  SELECT CAST(:query AS text) AS qstr, CAST(:alpha AS double precision) AS alpha
 ),
 vec AS (
   SELECT s.id AS segment_id,
