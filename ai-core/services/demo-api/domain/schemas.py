@@ -1,4 +1,4 @@
-from typing import List, Optional, Literal
+from typing import Dict, List, Optional, Literal
 from pydantic import BaseModel, Field
 from shared.contracts import ContextBundle, ContextChunk as SharedContextChunk, SpanRef
 
@@ -50,8 +50,20 @@ class DemoAnalyzeRequest(BaseModel):
 	locale: Optional[str] = "auto"
 
 
-class DemoAnalyzeResponse(AnalysisBundle):
+class DemoAnalyzeResponse(BaseModel):
+	event_id: str
 	context_id: str
+
+
+class DemoAnalyzeResultResponse(BaseModel):
+	event_id: str
+	status: Literal["partial", "complete", "failed"]
+	summary_json: Optional[Dict[str, object]] = None
+	argument_json: Optional[Dict[str, object]] = None
+	sentiment_json: Optional[Dict[str, object]] = None
+	logic_bias_json: Optional[Dict[str, object]] = None
+	citations: Optional[List[SpanRef]] = None
+	error_summary: Optional[str] = None
 
 
 class DemoQARequest(BaseModel):

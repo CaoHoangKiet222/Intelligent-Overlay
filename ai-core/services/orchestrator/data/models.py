@@ -29,6 +29,7 @@ class AnalysisRun(Base):
 	id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 	event_id = Column(String(64), unique=True, nullable=False)
 	bundle_id = Column(UUID(as_uuid=True))
+	callback_url = Column(String(512))
 	status = Column(String(16), nullable=False)
 	summary_json = Column(JSONB)
 	argument_json = Column(JSONB)

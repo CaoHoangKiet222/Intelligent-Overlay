@@ -1,7 +1,11 @@
 import asyncio
-import ray
-from typing import List
+import os
 from time import perf_counter
+from typing import List
+
+import httpx
+import ray
+
 from domain.schemas import AnalysisTask, WorkerResult
 from workers.summary_worker import run_summary
 from workers.argument_worker import run_argument
@@ -10,7 +14,6 @@ from workers.logic_bias_worker import run_logic_bias
 from orchestration.aggregator import aggregate
 from data.repositories import LlmCallRepo, AnalysisRunRepo, IdempotencyRepo
 from metrics.prometheus import observe_task_latency_ms, worker_failures, fanin_partial, dlq_counter
-import os
 
 WORKER_TIMEOUT = int(os.getenv("WORKER_TIMEOUT_SEC", "20"))
 
@@ -53,6 +56,10 @@ class OrchestratorService:
 		await self.run_repo.upsert(task, agg)
 		await self.idem_repo.mark_processed(task.event_id)
 
+		callback_url = (task.meta or {}).get("callback_url") if isinstance(task.meta, dict) else None
+		if callback_url:
+			await self._notify_callback(callback_url, agg)
+
 		took = int((perf_counter() - t0) * 1000)
 		observe_task_latency_ms(took)
 		if agg.status == "partial":
@@ -60,5 +67,15 @@ class OrchestratorService:
 		if agg.status == "failed":
 			dlq_counter.inc()
 			await self.dlq_producer.publish(task.event_id, task.model_dump(), reason=str(agg.error_summary))
+
+	async def _notify_callback(self, url: str, agg) -> None:
+		payload = agg.model_dump()
+		try:
+			async with httpx.AsyncClient(timeout=5.0) as client:
+				resp = await client.post(url, json=payload)
+				resp.raise_for_status()
+		except Exception:
+			# Không làm fail job nếu callback lỗi
+			return
 
 

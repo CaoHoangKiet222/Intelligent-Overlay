@@ -9,10 +9,8 @@ from typing import Any, Awaitable, Dict, List, Sequence, Tuple
 from domain.schemas import (
 	AnalysisBundleResponse,
 	ArgumentWorkerOutput,
-	ImplicationItem,
 	ImplicationSentimentOutput,
 	LogicBiasOutput,
-	SentimentResult,
 	SummaryWorkerOutput,
 )
 

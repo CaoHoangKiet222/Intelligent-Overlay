@@ -4,6 +4,7 @@ import os
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
+from uuid import uuid4
 from time import perf_counter
 import logging
 import httpx
@@ -16,15 +17,15 @@ if str(ai_core_path) not in sys.path:
 from shared.telemetry.logger import setup_json_logger
 from shared.telemetry.otel import init_otel
 from app.config import DemoConfig
-from domain.schemas import DemoAnalyzeRequest, DemoAnalyzeResponse, DemoQARequest, DemoQAResponse
+from domain.schemas import DemoAnalyzeRequest, DemoAnalyzeResponse, DemoAnalyzeResultResponse, DemoQARequest, DemoQAResponse
 from clients.retrieval import RetrievalClient
 from clients.model_adapter import ModelAdapterClient
 from clients.prompt_service import PromptServiceClient
 from services.context import ContextPipeline
-from services.analysis import AnalysisService
 from services.qa import QAService
 from services.prompt_bootstrap import PromptBootstrapper, PromptProvider, DEFAULT_PROMPTS
 from metrics.prometheus import metrics_app, analyze_latency, qa_latency
+from kafka.producer import AnalysisTaskProducer
 
 
 cfg = DemoConfig()
@@ -33,10 +34,15 @@ logger = logging.getLogger("demo-api")
 
 retrieval_client = RetrievalClient(cfg.retrieval_service_base_url)
 prompt_client = PromptServiceClient(cfg.prompt_service_base_url)
-model_client = ModelAdapterClient(cfg.model_adapter_base_url)
 prompt_provider = PromptProvider(prompt_client, cache_ttl_sec=cfg.prompt_cache_ttl_sec)
-analysis_service = AnalysisService(prompt_provider, model_client, cfg.worker_prompt_keys(), cfg.provider_hint)
-qa_service = QAService(retrieval_client, prompt_provider, model_client, cfg.qa_prompt_key, cfg.provider_hint, top_k=cfg.qa_top_k)
+qa_service = QAService(
+	retrieval_client,
+	prompt_provider,
+	ModelAdapterClient(cfg.model_adapter_base_url),
+	cfg.qa_prompt_key,
+	cfg.provider_hint,
+	top_k=cfg.qa_top_k,
+)
 context_pipeline = ContextPipeline(retrieval_client, cfg.context_segment_limit)
 bootstrapper = PromptBootstrapper(prompt_client)
 
@@ -45,7 +51,13 @@ bootstrapper = PromptBootstrapper(prompt_client)
 async def lifespan(app: FastAPI):
 	logger.info("Ensuring default prompts exist")
 	await bootstrapper.ensure_prompts(DEFAULT_PROMPTS)
+	app.state.analysis_task_producer = AnalysisTaskProducer(
+		bootstrap_servers=cfg.kafka_bootstrap,
+		topic_tasks=cfg.topic_tasks,
+	)
+	await app.state.analysis_task_producer.start()
 	yield
+	await app.state.analysis_task_producer.stop()
 
 
 app = FastAPI(title="AI-Core Demo API", version="0.1.0", lifespan=lifespan)
@@ -56,13 +68,32 @@ app.mount("/metrics", metrics_app)
 @app.post("/demo/analyze", response_model=DemoAnalyzeResponse)
 async def demo_analyze(payload: DemoAnalyzeRequest):
 	t0 = perf_counter()
-	result: DemoAnalyzeResponse | None = None
 	context_id: str | None = None
+	event_id: str | None = None
 	try:
 		context_bundle = await context_pipeline.create_bundle(payload.raw_text, payload.url, payload.locale)
 		context_id = context_bundle.context_id
-		result_bundle = await analysis_service.run(context_bundle)
-		result = DemoAnalyzeResponse(**result_bundle.model_dump())
+		event_id = str(uuid4())
+		prompt_ids = cfg.worker_prompt_keys()
+		task_payload = {
+			"event_id": event_id,
+			"bundle_id": None,
+			"query": None,
+			"segments": [segment.model_dump(by_alias=True) for segment in context_bundle.segments],
+			"language": (payload.locale or "auto"),
+			"prompt_ids": {
+				"summary": prompt_ids["summary"],
+				"argument": prompt_ids["argument"],
+				"sentiment": prompt_ids["sentiment"],
+				"logic_bias": prompt_ids["logic_bias"],
+			},
+			"meta": {
+				"source": "demo-api",
+				"source_url": payload.url,
+				"callback_url": f"{cfg.orchestrator_base_url.rstrip('/')}/demo/analyze/callback",
+			},
+		}
+		await app.state.analysis_task_producer.publish(task_payload)
 	except httpx.HTTPStatusError as exc:
 		logger.exception("Upstream error during analyze: %s", exc)
 		raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
@@ -72,8 +103,43 @@ async def demo_analyze(payload: DemoAnalyzeRequest):
 	finally:
 		elapsed = int((perf_counter() - t0) * 1000)
 		analyze_latency.observe(elapsed)
-		logger.info("demo_analyze completed", extra={"context_id": context_id, "took_ms": elapsed})
-	return result
+		logger.info("demo_analyze enqueued", extra={"context_id": context_id, "event_id": event_id, "took_ms": elapsed})
+	if not context_id or not event_id:
+		raise HTTPException(status_code=500, detail="analyze_enqueue_failed")
+	return DemoAnalyzeResponse(event_id=event_id, context_id=context_id)
+
+
+@app.get("/demo/analyze/{event_id}", response_model=DemoAnalyzeResultResponse)
+async def demo_analyze_result(event_id: str):
+	t0 = perf_counter()
+	try:
+		url = f"{cfg.orchestrator_base_url.rstrip('/')}/orchestrator/runs/{event_id}"
+		async with httpx.AsyncClient(timeout=10.0) as client:
+			resp = await client.get(url)
+		if resp.status_code == 404:
+			raise HTTPException(status_code=404, detail="analysis_not_found")
+		resp.raise_for_status()
+		body = resp.json()
+		return DemoAnalyzeResultResponse(**body)
+	except httpx.HTTPStatusError as exc:
+		logger.exception("Upstream error during analyze result fetch: %s", exc)
+		raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
+	except Exception as exc:
+		logger.exception("Unexpected error during analyze result fetch")
+		raise HTTPException(status_code=500, detail=str(exc))
+	finally:
+		elapsed = int((perf_counter() - t0) * 1000)
+		logger.info("demo_analyze_result completed", extra={"event_id": event_id, "took_ms": elapsed})
+
+
+@app.post("/demo/analyze/callback")
+async def demo_analyze_callback(payload: DemoAnalyzeResultResponse):
+	logger.info(
+		"demo_analyze_callback received",
+		extra={"event_id": payload.event_id, "status": payload.status},
+	)
+	# Ở đây có thể lưu cache, đẩy websocket, ... tuỳ nhu cầu
+	return {"ok": True}
 
 
 @app.post("/demo/qa", response_model=DemoQAResponse)

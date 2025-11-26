@@ -2,20 +2,23 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import Dict
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 
 from domain.schemas import (
 	AnalysisBundleResponse,
 	OrchestratorAnalyzeRequest,
+	AggregatedResult,
 )
+from shared.contracts import SpanRef
 from orchestration.realtime_orchestrator import REALTIME_ORCHESTRATOR, WorkerCall
 from workers.argument_worker import analyze_arguments
 from workers.logic_bias_worker import analyze_logic_bias
 from workers.sentiment_worker import analyze_implication_sentiment
 from workers.summary_worker import summarize_context
 from workers.utils import fetch_context_chunks, normalize_chunks
+from data.repositories import AnalysisRunRepo
 
 router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
 ANALYSIS_SEGMENT_LIMIT = int(os.getenv("ANALYSIS_SEGMENT_LIMIT", "12"))
@@ -97,4 +100,25 @@ def _build_worker_calls(
 			),
 		),
 	]
+
+
+@router.get("/runs/{event_id}", response_model=AggregatedResult)
+async def get_run(event_id: str) -> AggregatedResult:
+	repo = AnalysisRunRepo()
+	row = await repo.get(event_id)
+	if row is None:
+		raise HTTPException(status_code=404, detail="analysis_not_found")
+	citations: Optional[List[SpanRef]] = None
+	if row.citations:
+		citations = [SpanRef.model_validate(span) for span in row.citations]
+	return AggregatedResult(
+		event_id=row.event_id,
+		status=row.status,
+		summary_json=row.summary_json,
+		argument_json=row.argument_json,
+		sentiment_json=row.sentiment_json,
+		logic_bias_json=row.logic_bias_json,
+		citations=citations,
+		error_summary=row.error_summary,
+	)
 

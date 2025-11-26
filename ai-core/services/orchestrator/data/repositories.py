@@ -35,6 +35,7 @@ class AnalysisRunRepo:
 			obj = AnalysisRun(
 				event_id=task.event_id,
 				bundle_id=task.bundle_id,
+				callback_url=(task.meta or {}).get("callback_url") if isinstance(task.meta, dict) else None,
 				status=agg.status,
 				summary_json=agg.summary_json,
 				argument_json=agg.argument_json,
@@ -45,6 +46,10 @@ class AnalysisRunRepo:
 			)
 			s.add(obj)
 			await s.commit()
+
+	async def get(self, event_id: str):
+		async with SessionLocal() as s:
+			return await s.get(AnalysisRun, event_id)
 
 
 class IdempotencyRepo:
