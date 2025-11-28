@@ -7,7 +7,7 @@ class AskRequest(BaseModel):
 	query: str
 	session_id: Optional[str] = None
 	language: str = "auto"
-	meta: Dict[str, Any] = {}
+	meta: Dict[str, Any] = Field(default_factory=dict)
 
 
 class AskResponse(BaseModel):
@@ -15,7 +15,7 @@ class AskResponse(BaseModel):
 	answer: str
 	citations: List[SpanRef]
 	plan: Dict[str, Any]
-	tool_result: Dict[str, Any]
+	tool_result: Optional[Dict[str, Any]] = None
 	logs: List[str]
 
 

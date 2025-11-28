@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from typing import Sequence, Dict, Any
+from typing import Sequence, Dict, Any, Optional
+
+from clients.model_adapter import llm_generate
+from domain.composer import build_answer_prompt
+from domain.state import AgentState
 
 
 def estimate_confidence(results: Sequence[Dict[str, Any]], answer: str) -> float:
@@ -24,4 +28,17 @@ def estimate_confidence(results: Sequence[Dict[str, Any]], answer: str) -> float
 	if "không chắc" in lower or "khong chac" in lower or "does not know" in lower:
 		base = min(base, 0.5)
 	return round(min(0.95, base), 2)
+
+
+async def generate_answer(state: AgentState, tool_result: Optional[str]) -> str:
+	q = state.redacted_query or state.original_query
+	ctx = [r.get("text", "") for r in state.retrieved if r.get("text")]
+	prompt = build_answer_prompt(q, ctx, tool_result, allow_external=state.allow_external)
+	out = await llm_generate(
+		prompt=prompt,
+		context="\n".join(ctx),
+		language=state.language,
+		model_hint="openai",
+	)
+	return (out.get("output") or "").strip()
 

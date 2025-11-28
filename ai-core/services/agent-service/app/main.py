@@ -75,9 +75,9 @@ def create_app() -> FastAPI:
 				tool_result=out.tool_result,
 				logs=out.logs,
 			)
-		except Exception as e:
-			logger.error(f"Error in ask: {e}")
-			raise HTTPException(status_code=500, detail=str(e))
+		except Exception as exc:
+			logger.error("ask_error", exc_info=exc)
+			raise HTTPException(status_code=500, detail="ask_failed") from exc
 
 	@application.get("/healthz")
 	async def healthz():

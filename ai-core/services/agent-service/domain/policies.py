@@ -14,7 +14,6 @@ def redact_pii(text: str) -> Tuple[str, Dict[str, Any]]:
 	tmp = PHONE.sub("[PHONE]", red)
 	if tmp != red:
 		flags["phone_masked"] = True
-	# TODO: Need to define other PII types
 	return tmp, flags
 
 
