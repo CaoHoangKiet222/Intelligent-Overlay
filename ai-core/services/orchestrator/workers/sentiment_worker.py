@@ -15,11 +15,12 @@ from domain.schemas import (
 )
 from workers.base import call_llm_generate
 from workers.utils import ensure_context_id, fetch_context_chunks, format_context, normalize_chunks
+from app.config import OrchestratorConfig
+
+_config = OrchestratorConfig.from_env()
 
 IMPLICATION_PROMPT_REF = os.getenv("IMPLICATION_PROMPT_REF", "key:demo.implication.v1")
 SENTIMENT_PROMPT_REF = os.getenv("SENTIMENT_PROMPT_REF", "key:demo.sentiment.v1")
-IMPLICATION_MODEL_HINT = os.getenv("IMPLICATION_MODEL_HINT", "openai")
-SENTIMENT_MODEL_HINT = os.getenv("SENTIMENT_MODEL_HINT", "openai")
 SENTIMENT_SEGMENT_LIMIT = int(os.getenv("SENTIMENT_SEGMENT_LIMIT", "12"))
 MAX_IMPLICATIONS = int(os.getenv("MAX_IMPLICATIONS", "4"))
 SEG_PATTERN = re.compile(r"seg:([0-9a-fA-F\-]{8,})", re.IGNORECASE)
@@ -64,7 +65,7 @@ async def _classify_sentiment(context_text: str, prompt_ref: str, language: str)
 		prompt_ref=prompt_ref,
 		variables={"context": context_text},
 		language=language or "auto",
-		provider_hint=SENTIMENT_MODEL_HINT,
+		provider_hint=_config.sentiment_model_hint,
 	)
 	raw = str(resp.get("output") or "").strip()
 	return _parse_sentiment_output(raw), resp
@@ -124,7 +125,7 @@ async def _generate_implications(
 		prompt_ref=prompt_ref,
 		variables={"context": context_text},
 		language=language or "auto",
-		provider_hint=IMPLICATION_MODEL_HINT,
+		provider_hint=_config.implication_model_hint,
 	)
 	raw = str(resp.get("output") or "").strip()
 	items = _parse_implication_output(raw, chunks)

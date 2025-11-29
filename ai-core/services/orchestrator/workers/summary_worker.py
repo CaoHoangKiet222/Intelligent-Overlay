@@ -17,9 +17,11 @@ from workers.utils import (
 	normalize_chunks,
 )
 from domain.schemas import SummaryWorkerBullet, SummaryWorkerOutput
+from app.config import OrchestratorConfig
+
+_config = OrchestratorConfig.from_env()
 
 SUMMARY_PROMPT_REF = os.getenv("SUMMARY_PROMPT_REF", "key:demo.summary.v1")
-SUMMARY_MODEL_HINT = os.getenv("SUMMARY_MODEL_HINT", "openai")
 SUMMARY_SEGMENT_LIMIT = int(os.getenv("SUMMARY_SEGMENT_LIMIT", "12"))
 SUMMARY_MIN_BULLETS = int(os.getenv("SUMMARY_MIN_BULLETS", "3"))
 SUMMARY_MAX_BULLETS = int(os.getenv("SUMMARY_MAX_BULLETS", "5"))
@@ -121,7 +123,7 @@ PIPELINE = SummaryPipeline(
 	segment_limit=SUMMARY_SEGMENT_LIMIT,
 	min_bullets=SUMMARY_MIN_BULLETS,
 	max_bullets=SUMMARY_MAX_BULLETS,
-	model_hint=SUMMARY_MODEL_HINT,
+	model_hint=_config.summary_model_hint,
 	verifier=None,
 )
 

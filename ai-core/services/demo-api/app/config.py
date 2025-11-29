@@ -14,7 +14,7 @@ class DemoConfig:
 		self.context_segment_limit = int(os.getenv("CONTEXT_SEGMENT_LIMIT", "12"))
 		self.qa_top_k = int(os.getenv("QA_TOP_K", "4"))
 		self.prompt_cache_ttl_sec = int(os.getenv("PROMPT_CACHE_TTL_SEC", "300"))
-		self.provider_hint = os.getenv("MODEL_PROVIDER_HINT", "openai")
+		self.provider_hint = os.getenv("MODEL_PROVIDER_HINT", "ollama")
 		self.summary_prompt_key = os.getenv("SUMMARY_PROMPT_KEY", "demo.summary.v1")
 		self.argument_prompt_key = os.getenv("ARGUMENT_PROMPT_KEY", "demo.argument.v1")
 		self.implication_prompt_key = os.getenv("IMPLICATION_PROMPT_KEY", "demo.implication.v1")

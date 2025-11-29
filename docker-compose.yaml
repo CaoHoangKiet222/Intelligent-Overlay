@@ -248,6 +248,10 @@ services:
       PORT: 8000
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       RAY_ADDRESS: ray-head:6379
+      MODEL_ADAPTER_BASE_URL: ${MODEL_ADAPTER_BASE_URL:-http://model-adapter:8000}
+      RETRIEVAL_SERVICE_BASE_URL: ${RETRIEVAL_SERVICE_BASE_URL:-http://retrieval-service:8000}
+      AGENT_PLANNER_MODEL_HINT: ${AGENT_PLANNER_MODEL_HINT:-ollama}
+      AGENT_ANSWER_MODEL_HINT: ${AGENT_ANSWER_MODEL_HINT:-ollama}
     depends_on:
       redis:
         condition: service_healthy
@@ -278,6 +282,12 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ai:ai@postgres:5432/ai_core}
       MODEL_ADAPTER_BASE_URL: ${MODEL_ADAPTER_BASE_URL:-http://model-adapter:8000}
       PROMPT_SERVICE_BASE_URL: ${PROMPT_SERVICE_BASE_URL:-http://prompt-service:8000}
+      SUMMARY_MODEL_HINT: ${SUMMARY_MODEL_HINT:-ollama}
+      SENTIMENT_MODEL_HINT: ${SENTIMENT_MODEL_HINT:-ollama}
+      IMPLICATION_MODEL_HINT: ${IMPLICATION_MODEL_HINT:-ollama}
+      ARGUMENT_CLAIM_MODEL_HINT: ${ARGUMENT_CLAIM_MODEL_HINT:-ollama}
+      ARGUMENT_REASON_MODEL_HINT: ${ARGUMENT_REASON_MODEL_HINT:-ollama}
+      LOGIC_BIAS_MODEL_HINT: ${LOGIC_BIAS_MODEL_HINT:-ollama}
     depends_on:
       redis:
         condition: service_healthy

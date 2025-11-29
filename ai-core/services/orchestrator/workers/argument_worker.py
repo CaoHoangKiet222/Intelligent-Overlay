@@ -17,11 +17,12 @@ from workers.utils import (
 	normalize_chunks,
 	search_spans,
 )
+from app.config import OrchestratorConfig
+
+_config = OrchestratorConfig.from_env()
 
 CLAIM_PROMPT_REF = os.getenv("ARGUMENT_CLAIM_PROMPT_REF", "key:demo.argument.claims.v1")
 REASON_PROMPT_REF = os.getenv("ARGUMENT_REASON_PROMPT_REF", "key:demo.argument.reasoning.v1")
-CLAIM_MODEL_HINT = os.getenv("ARGUMENT_CLAIM_MODEL_HINT", "openai")
-REASON_MODEL_HINT = os.getenv("ARGUMENT_REASON_MODEL_HINT", "openai")
 ARGUMENT_SEGMENT_LIMIT = int(os.getenv("ARGUMENT_SEGMENT_LIMIT", "12"))
 ARGUMENT_MIN_CLAIMS = int(os.getenv("ARGUMENT_MIN_CLAIMS", "3"))
 ARGUMENT_MAX_CLAIMS = int(os.getenv("ARGUMENT_MAX_CLAIMS", "7"))
@@ -83,7 +84,7 @@ async def _mine_claims(context_text: str, prompt_ref: str, language: str) -> Tup
 		prompt_ref=prompt_ref,
 		variables={"context": context_text},
 		language=language or "auto",
-		provider_hint=CLAIM_MODEL_HINT,
+		provider_hint=_config.argument_claim_model_hint,
 	)
 	raw = str(llm_resp.get("output") or "").strip()
 	claims = _parse_claims(raw)
@@ -184,7 +185,7 @@ async def _write_reasonings(
 			prompt_ref=prompt_ref,
 			variables={"context": context_text, "claim": claim, "evidence": snippet_block},
 			language=language or "auto",
-			provider_hint=REASON_MODEL_HINT,
+			provider_hint=_config.argument_reason_model_hint,
 		)
 		text = str(resp.get("output") or "").strip()
 		return _parse_reasoning_output(text), resp

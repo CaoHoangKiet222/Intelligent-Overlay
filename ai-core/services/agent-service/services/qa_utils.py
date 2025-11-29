@@ -5,6 +5,9 @@ from typing import Sequence, Dict, Any, Optional
 from clients.model_adapter import llm_generate
 from domain.composer import build_answer_prompt
 from domain.state import AgentState
+from app.config import AgentConfig
+
+_config = AgentConfig.from_env()
 
 
 def estimate_confidence(results: Sequence[Dict[str, Any]], answer: str) -> float:
@@ -38,7 +41,7 @@ async def generate_answer(state: AgentState, tool_result: Optional[str]) -> str:
 		prompt=prompt,
 		context="\n".join(ctx),
 		language=state.language,
-		model_hint="openai",
+		model_hint=_config.answer_model_hint,
 	)
 	return (out.get("output") or "").strip()
 

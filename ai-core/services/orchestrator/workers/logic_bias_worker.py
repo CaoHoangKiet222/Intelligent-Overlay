@@ -12,9 +12,11 @@ from shared.contracts import ContextChunk, SpanRef
 from domain.schemas import LogicBiasFinding, LogicBiasOutput
 from workers.base import call_llm_generate
 from workers.utils import ensure_context_id, fetch_context_chunks, normalize_chunks
+from app.config import OrchestratorConfig
+
+_config = OrchestratorConfig.from_env()
 
 LOGIC_BIAS_PROMPT_REF = os.getenv("LOGIC_BIAS_PROMPT_REF", "key:demo.logic_bias.v1")
-LOGIC_BIAS_MODEL_HINT = os.getenv("LOGIC_BIAS_MODEL_HINT", "openai")
 LOGIC_BIAS_SEGMENT_LIMIT = int(os.getenv("LOGIC_BIAS_SEGMENT_LIMIT", "12"))
 LOGIC_BIAS_MAX_FINDINGS = int(os.getenv("LOGIC_BIAS_MAX_FINDINGS", "6"))
 HEURISTIC_KEYWORDS = [
@@ -104,7 +106,7 @@ async def _validate_hits(
 			prompt_ref=prompt_ref,
 			variables={"snippet": span_text, "context_id": context_id},
 			language=language or "auto",
-			provider_hint=LOGIC_BIAS_MODEL_HINT,
+			provider_hint=_config.logic_bias_model_hint,
 		)
 		text = str(resp.get("output") or "").strip()
 		finding = _parse_bias_output(hit, text)

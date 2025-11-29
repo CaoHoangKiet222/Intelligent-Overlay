@@ -20,7 +20,7 @@ class RouterPolicy:
 		self._task_routing = {k.lower(): v for k, v in (task_routing or {}).items()}
 
 	def default_embedding_provider(self) -> str:
-		return "openai" if "openai" in self._registry.names() else self._registry.names()[0]
+		return "ollama" if "ollama" in self._registry.names() else self._registry.names()[0]
 
 	def choose_provider_for_embedding(self, model_hint: Optional[str]) -> BaseProvider:
 		if model_hint:

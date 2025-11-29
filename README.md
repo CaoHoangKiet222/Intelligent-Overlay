@@ -89,7 +89,7 @@ PROVIDER_KEYS={"ollama":"ollama"}
 TASK_ROUTING={"summary":"ollama","qa":"ollama","argument":"ollama","logic_bias":"ollama","sentiment":"ollama"}
 
 # Retrieval Service - Sử dụng Ollama embeddings
-EMBED_MODEL_HINT=ollama
+EMBED_MODEL_HINT=qwen3-embedding:0.6b
 EMBEDDING_DIM=1024
 ```
 

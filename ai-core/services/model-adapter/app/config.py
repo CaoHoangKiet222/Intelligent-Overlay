@@ -17,6 +17,7 @@ class AppConfig:
 	def from_env() -> "AppConfig":
 		raw = os.getenv("PROVIDER_KEYS", "{}")
 		task_raw = os.getenv("TASK_ROUTING", "{}")
+		default_task_raw = os.getenv("TASK_ROUTING_DEFAULTS", '{"summary":"ollama","qa":"ollama","argument":"ollama","logic_bias":"ollama","sentiment":"ollama"}')
 		try:
 			parsed: Dict[str, str] = json.loads(raw)
 		except Exception:
@@ -25,13 +26,16 @@ class AppConfig:
 			task_map: Dict[str, str] = json.loads(task_raw)
 		except Exception:
 			task_map = {}
-		default_map = {
-			"summary": "openai",
-			"qa": "openai",
-			"argument": "anthropic",
-			"logic_bias": "anthropic",
-			"sentiment": "openai",
-		}
+		try:
+			default_map: Dict[str, str] = json.loads(default_task_raw)
+		except Exception:
+			default_map = {
+				"summary": "ollama",
+				"qa": "ollama",
+				"argument": "ollama",
+				"logic_bias": "ollama",
+				"sentiment": "ollama",
+			}
 		for k, v in default_map.items():
 			task_map.setdefault(k, v)
 		return AppConfig(

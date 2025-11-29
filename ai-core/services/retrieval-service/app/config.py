@@ -2,7 +2,7 @@ import os
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://ai:ai@postgres:5432/ai_core")
 MODEL_ADAPTER_BASE_URL = os.getenv("MODEL_ADAPTER_BASE_URL", "http://model-adapter:8000")
-EMBED_MODEL_HINT = os.getenv("EMBED_MODEL_HINT", "ollama")
+EMBED_MODEL_HINT = os.getenv("EMBED_MODEL_HINT", "qwen3-embedding:0.6b")
 EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", "1024"))
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 SEARCH_ALPHA = float(os.getenv("SEARCH_ALPHA", "0.7"))

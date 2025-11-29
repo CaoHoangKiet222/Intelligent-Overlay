@@ -1,20 +1,23 @@
 import os
+from dataclasses import dataclass
 
-KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "broker:9092")
-KAFKA_GROUP = os.getenv("KAFKA_GROUP", "aicore-orchestrator")
-TOPIC_TASKS = os.getenv("TOPIC_TASKS", "analysis.tasks")
-TOPIC_DLQ = os.getenv("TOPIC_DLQ", "analysis.dlq")
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://ai:ai@postgres:5432/ai_core")
+@dataclass(frozen=True)
+class OrchestratorConfig:
+	summary_model_hint: str
+	sentiment_model_hint: str
+	implication_model_hint: str
+	argument_claim_model_hint: str
+	argument_reason_model_hint: str
+	logic_bias_model_hint: str
 
-MODEL_ADAPTER_BASE_URL = os.getenv("MODEL_ADAPTER_BASE_URL", "http://model-adapter:8000")
-PROMPT_SERVICE_BASE_URL = os.getenv("PROMPT_SERVICE_BASE_URL", "http://prompt-service:8000")
-
-RAY_ADDRESS = os.getenv("RAY_ADDRESS", "")
-RAY_NUM_CPUS = int(os.getenv("RAY_NUM_CPUS", "2"))
-RAY_NUM_GPUS = int(os.getenv("RAY_NUM_GPUS", "0"))
-
-WORKER_TIMEOUT_SEC = int(os.getenv("WORKER_TIMEOUT_SEC", "20"))
-WORKER_MAX_RETRY = int(os.getenv("WORKER_MAX_RETRY", "2"))
-ORCHESTRATOR_MAX_RETRY = int(os.getenv("ORCHESTRATOR_MAX_RETRY", "1"))
-
+	@staticmethod
+	def from_env() -> "OrchestratorConfig":
+		return OrchestratorConfig(
+			summary_model_hint=os.getenv("SUMMARY_MODEL_HINT", "ollama"),
+			sentiment_model_hint=os.getenv("SENTIMENT_MODEL_HINT", "ollama"),
+			implication_model_hint=os.getenv("IMPLICATION_MODEL_HINT", "ollama"),
+			argument_claim_model_hint=os.getenv("ARGUMENT_CLAIM_MODEL_HINT", "ollama"),
+			argument_reason_model_hint=os.getenv("ARGUMENT_REASON_MODEL_HINT", "ollama"),
+			logic_bias_model_hint=os.getenv("LOGIC_BIAS_MODEL_HINT", "ollama"),
+		)
