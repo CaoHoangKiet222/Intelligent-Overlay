@@ -108,12 +108,29 @@ docker logs -f ai_core_ollama_init
 curl http://localhost:11434/api/tags
 ```
 
-### Chạy không có GPU
+### Cấu hình GPU
 
-Nếu không có NVIDIA GPU, có thể chạy Ollama trên CPU (chậm hơn):
+#### NVIDIA GPU (Linux)
+Ollama sẽ tự động phát hiện và sử dụng NVIDIA GPU nếu có NVIDIA Container Toolkit được cài đặt.
 
-1. Sửa `docker-compose.yaml`, bỏ phần `deploy.resources` trong service `ollama`
-2. Hoặc set environment variable: `OLLAMA_NUM_GPU=0`
+#### AMD/ROCm GPU (Linux)
+Để sử dụng AMD GPU với ROCm, uncomment phần `devices` trong `docker-compose.yaml`:
+```yaml
+devices:
+  - /dev/dri:/dev/dri
+```
+
+#### Apple Silicon GPU (macOS)
+Docker trên macOS không hỗ trợ GPU passthrough. Để sử dụng Metal GPU:
+1. Cài đặt Ollama native: `brew install ollama`
+2. Chạy Ollama: `ollama serve`
+3. Cập nhật `OLLAMA_BASE_URL` trong `.env` để trỏ đến `http://localhost:11434/api`
+4. Comment out service `ollama` trong `docker-compose.yaml` hoặc không chạy nó
+
+#### Chạy không có GPU (CPU only)
+Nếu không có GPU, Ollama sẽ tự động chạy trên CPU (chậm hơn):
+- Set environment variable: `OLLAMA_NUM_GPU=0` trong `.env`
+- Hoặc để Ollama tự động phát hiện (mặc định sẽ dùng CPU nếu không tìm thấy GPU)
 
 ## Chạy và kiểm tra services
 

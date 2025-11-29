@@ -6,31 +6,30 @@ services:
     container_name: ai_core_ollama
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_NUM_GPU: ${OLLAMA_NUM_GPU:-}
+      OLLAMA_GPU_ENABLED: ${OLLAMA_GPU_ENABLED:-true}
     ports:
       - "${OLLAMA_PORT:-11434}:11434"
     volumes:
       - ollama_data:/root/.ollama
     networks:
       - ai_core_network
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    # Uncomment below for AMD/ROCm GPU support on Linux
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # For Apple Silicon (macOS), run Ollama natively instead of Docker
+    # to use Metal GPU acceleration
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
 
   ollama-init:
     image: curlimages/curl:latest
     container_name: ai_core_ollama_init
     depends_on:
-      ollama:
-        condition: service_healthy
+      - ollama
     environment:
       OLLAMA_HOST: http://ollama:11434
     networks:
