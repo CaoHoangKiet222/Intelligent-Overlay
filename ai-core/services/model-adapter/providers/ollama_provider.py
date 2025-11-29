@@ -17,7 +17,7 @@ CHAT_COMPLETIONS_ENDPOINT = "/chat"
 EMBEDDINGS_ENDPOINT = "/embed"
 DEFAULT_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434/api")
 DEFAULT_GENERATION_MODEL = "phi3:mini"
-DEFAULT_EMBED_MODEL = "bge-micro"
+DEFAULT_EMBED_MODEL = "qwen3-embedding:0.6b"
 
 
 class OllamaProvider(BaseProvider):

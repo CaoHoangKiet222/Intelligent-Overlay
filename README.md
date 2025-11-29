@@ -52,7 +52,7 @@ curl http://localhost:8081/providers
 ## Services
 
 - **Ollama** (LLM Runtime): Local LLM inference server với OpenAI-compatible API - Port 11434
-  - Tự động preload các models: `phi3:mini`, `bge-micro`
+  - Tự động preload các models: `phi3:mini`, `qwen3-embedding:0.6b`
   - Models được tối ưu cho GPU 4GB
   - Base URL: `http://ollama:11434/api` (internal) hoặc `http://localhost:11434/api` (external)
 - **Model Adapter** (FastAPI): `ai-core/services/model-adapter` (POST /generate, POST /embed, GET /providers) - Port 8081
@@ -60,7 +60,7 @@ curl http://localhost:8081/providers
   - Ollama provider sử dụng OpenAI-compatible API endpoint
 - **Prompt Service** (FastAPI): `ai-core/services/prompt-service` (CRUD prompt/version + cache) - Port 8082
 - **Retrieval Service** (FastAPI): `ai-core/services/retrieval-service` (POST /ingest, POST /search) - Port 8083
-  - Sử dụng Ollama embeddings (bge-micro, 384 dim) mặc định
+  - Sử dụng Ollama embeddings (qwen3-embedding:0.6b, 1024 dim) mặc định
 - **Agent Service** (FastAPI + LangGraph): `ai-core/services/agent-service` (POST /agent/ask) - Port 8084
 - **Orchestrator** (Kafka + Ray + FastAPI): `ai-core/services/orchestrator` - Port 8085
 - **Demo API** (FastAPI): `ai-core/services/demo-api` (POST /demo/analyze, POST /demo/qa) - Port 8090
@@ -72,9 +72,7 @@ Mỗi service có README riêng hướng dẫn chạy local và endpoints.
 ### Models được sử dụng
 
 - **phi3:mini**: Model chính cho generation tasks (~2.3GB), chất lượng tốt cho general purpose
-- **qwen2.5:1.5b**: Model chất lượng cao cho các tasks phức tạp, tốt cho reasoning
-- **qwen2.5:0.5b**: Model siêu nhẹ cho classification và simple tasks, rất nhanh
-- **bge-micro**: Embedding model nhỏ gọn (384 dim), phù hợp cho retrieval và semantic search
+- **qwen3-embedding:0.6b**: Embedding model chất lượng cao (1024 dim), tốt cho retrieval và semantic search
 
 ### Cấu hình môi trường
 
@@ -84,7 +82,7 @@ Tạo file `.env` từ `.env.example` và cấu hình:
 # Ollama Configuration
 OLLAMA_BASE_URL=http://ollama:11434/api
 OLLAMA_GENERATION_MODEL=phi3:mini
-OLLAMA_EMBEDDING_MODEL=bge-micro
+OLLAMA_EMBEDDING_MODEL=qwen3-embedding:0.6b
 
 # Model Adapter - Sử dụng Ollama làm provider mặc định
 PROVIDER_KEYS={"ollama":"ollama"}
@@ -92,7 +90,7 @@ TASK_ROUTING={"summary":"ollama","qa":"ollama","argument":"ollama","logic_bias":
 
 # Retrieval Service - Sử dụng Ollama embeddings
 EMBED_MODEL_HINT=ollama
-EMBEDDING_DIM=384
+EMBEDDING_DIM=1024
 ```
 
 ### Chạy Ollama riêng lẻ

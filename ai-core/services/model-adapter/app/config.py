@@ -40,6 +40,6 @@ class AppConfig:
 			task_routing=task_map,
 			ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434/api"),
 			ollama_generation_model=os.getenv("OLLAMA_GENERATION_MODEL", "phi3:mini"),
-			ollama_embedding_model=os.getenv("OLLAMA_EMBEDDING_MODEL", "bge-micro"),
+			ollama_embedding_model=os.getenv("OLLAMA_EMBEDDING_MODEL", "qwen3-embedding:0.6b"),
 		)
 

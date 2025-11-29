@@ -181,7 +181,7 @@ services:
       PROVIDER_KEYS: ${PROVIDER_KEYS:-{}}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434/api}
       OLLAMA_GENERATION_MODEL: ${OLLAMA_GENERATION_MODEL:-phi3:mini}
-      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-bge-micro}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-qwen3-embedding:0.6b}
     depends_on:
       postgres:
         condition: service_healthy

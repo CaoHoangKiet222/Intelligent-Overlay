@@ -9,10 +9,8 @@ echo "OLLAMA_HOST: $OLLAMA_HOST"
 
 # Models được chọn tối ưu cho GPU 4GB:
 # - phi3:mini: Model chính cho generation tasks, nhẹ (~2.3GB), chất lượng tốt cho general purpose
-# - qwen2.5:1.5b: Model chất lượng cao cho các tasks phức tạp hơn, tốt cho reasoning và quality tasks
-# - qwen2.5:0.5b: Model siêu nhẹ cho classification và simple tasks, rất nhanh
-# - bge-micro: Embedding model nhỏ gọn (384 dim), phù hợp cho retrieval và semantic search
-MODELS="phi3:mini bge-micro"
+# - qwen3-embedding:0.6b: Embedding model chất lượng cao (1024 dim), tốt cho retrieval và semantic search
+MODELS="phi3:mini qwen3-embedding:0.6b"
 
 wait_for_ollama() {
   echo "⏳ Waiting for Ollama to be ready..."
