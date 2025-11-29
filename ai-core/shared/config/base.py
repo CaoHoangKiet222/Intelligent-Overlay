@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from typing import Optional
+from .timeout_config import TimeoutConfig, get_timeout_config
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,7 @@ class BaseConfig:
 	ray_address: str
 	ray_num_cpus: int
 	ray_num_gpus: int
+	timeout_config: TimeoutConfig
 	
 	@staticmethod
 	def from_env() -> "BaseConfig":
@@ -112,6 +114,7 @@ class BaseConfig:
 			ray_address=os.getenv("RAY_ADDRESS", ""),
 			ray_num_cpus=int(os.getenv("RAY_NUM_CPUS", "2")),
 			ray_num_gpus=int(os.getenv("RAY_NUM_GPUS", "0")),
+			timeout_config=get_timeout_config(),
 		)
 
 

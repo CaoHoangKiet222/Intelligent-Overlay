@@ -3,6 +3,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 import httpx
 from domain.errors import TransientHTTPError
 from app.config import WORKER_MAX_RETRY, MODEL_ADAPTER_BASE_URL
+from shared.config.base import get_base_config
 
 MODEL_ADAPTER = MODEL_ADAPTER_BASE_URL
 
@@ -32,7 +33,9 @@ async def call_llm_generate(
 	if context_len:
 		body["context_len"] = context_len
 	try:
-		async with httpx.AsyncClient(timeout=30.0) as client:
+		timeout_config = get_base_config().timeout_config
+		timeout = timeout_config.http_model_adapter.to_httpx_simple_timeout()
+		async with httpx.AsyncClient(timeout=timeout) as client:
 			r = await client.post(f"{MODEL_ADAPTER}/model/generate", json=body)
 			if r.status_code >= 500:
 				raise TransientHTTPError(f"Upstream 5xx: {r.text}")

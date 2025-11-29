@@ -29,9 +29,12 @@ class OllamaProvider(BaseProvider):
 		self._mock_mode = False
 		self._client: httpx.Client | None = None
 		if not self._mock_mode:
+			from shared.config.base import get_base_config
+			timeout_config = get_base_config().timeout_config
+			timeout = timeout_config.providers.get_ollama_timeout()
 			self._client = httpx.Client(
 				base_url=self._base_url,
-				timeout=httpx.Timeout(120.0, connect=30.0),
+				timeout=timeout,
 				headers={
 					"Authorization": f"Bearer {self._api_key}",
 					"Content-Type": "application/json",

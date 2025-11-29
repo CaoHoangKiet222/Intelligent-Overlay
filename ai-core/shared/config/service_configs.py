@@ -64,7 +64,7 @@ class OrchestratorServiceConfig:
 			kafka_group=base.kafka_group,
 			topic_tasks=base.topic_tasks,
 			topic_dlq=base.topic_dlq,
-			worker_timeout_sec=int(os.getenv("WORKER_TIMEOUT_SEC", "20")),
+			worker_timeout_sec=int(base.timeout_config.workers.orchestrator_worker),
 			worker_max_retry=int(os.getenv("WORKER_MAX_RETRY", "2")),
 			orchestrator_max_retry=int(os.getenv("ORCHESTRATOR_MAX_RETRY", "1")),
 		)

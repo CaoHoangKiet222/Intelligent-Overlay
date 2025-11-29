@@ -26,9 +26,12 @@ class OpenAIProvider(BaseProvider):
 		self._mock_mode = not bool(self._api_key)
 		self._client: httpx.Client | None = None
 		if not self._mock_mode:
+			from shared.config.base import get_base_config
+			timeout_config = get_base_config().timeout_config
+			timeout = timeout_config.providers.get_openai_timeout()
 			self._client = httpx.Client(
 				base_url="https://api.openai.com/v1",
-				timeout=httpx.Timeout(30.0, connect=10.0),
+				timeout=timeout,
 				headers={
 					"Authorization": f"Bearer {self._api_key}",
 					"Content-Type": "application/json",

@@ -34,8 +34,11 @@ def format_context(chunks: Sequence[ContextChunk]) -> str:
 
 
 async def fetch_context_chunks(context_id: str, limit: int) -> List[ContextChunk]:
+	from shared.config.base import get_base_config
 	url = f"{RETRIEVAL_SERVICE_BASE_URL.rstrip('/')}/retrieval/context/{context_id}"
-	async with httpx.AsyncClient(timeout=10.0) as client:
+	timeout_config = get_base_config().timeout_config
+	timeout = timeout_config.workers.retrieval_context
+	async with httpx.AsyncClient(timeout=timeout) as client:
 		resp = await client.get(url, params={"limit": limit})
 		resp.raise_for_status()
 		body = resp.json()
@@ -49,6 +52,7 @@ async def search_spans(
 	top_k: int,
 	mode: str = "hybrid",
 ) -> List[Tuple[SpanRef, str]]:
+	from shared.config.base import get_base_config
 	payload: Dict[str, object] = {
 		"context_id": context_id,
 		"query": query,
@@ -56,7 +60,9 @@ async def search_spans(
 		"mode": mode,
 	}
 	url = f"{RETRIEVAL_SERVICE_BASE_URL.rstrip('/')}/retrieval/search"
-	async with httpx.AsyncClient(timeout=12.0) as client:
+	timeout_config = get_base_config().timeout_config
+	timeout = timeout_config.workers.retrieval_search
+	async with httpx.AsyncClient(timeout=timeout) as client:
 		resp = await client.post(url, json=payload)
 		resp.raise_for_status()
 		body = resp.json()

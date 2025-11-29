@@ -21,6 +21,7 @@ from guardrails.pipeline import apply_guardrails
 from shared.telemetry.otel import init_otel
 from shared.telemetry.logger import setup_json_logger
 from shared.telemetry.metrics import metrics_app
+from shared.config.base import get_base_config
 from clients.prompt_service import PromptServiceClient
 from domain.models import GenerationResult
 
@@ -74,7 +75,11 @@ def create_app() -> FastAPI:
 	registry = ProviderRegistry.from_config(cfg)
 	policy = RouterPolicy(registry, cfg.task_routing)
 	gen_service = GenerationService(registry, policy)
-	prompt_client = PromptServiceClient(cfg.prompt_service_base_url)
+	timeout_config = get_base_config().timeout_config
+	prompt_client = PromptServiceClient(
+		cfg.prompt_service_base_url,
+		timeout=timeout_config.services.prompt_service
+	)
 	renderer = PromptRenderer(prompt_client)
 	logger = logging.getLogger("model-adapter")
 

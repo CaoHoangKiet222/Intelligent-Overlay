@@ -16,6 +16,7 @@ if str(ai_core_path) not in sys.path:
 
 from shared.telemetry.logger import setup_json_logger
 from shared.telemetry.otel import init_otel
+from shared.config.base import get_base_config
 from app.config import DemoConfig
 from domain.schemas import DemoAnalyzeRequest, DemoAnalyzeResponse, DemoAnalyzeResultResponse, DemoQARequest, DemoQAResponse
 from clients.retrieval import RetrievalClient
@@ -33,14 +34,15 @@ cfg = DemoConfig()
 setup_json_logger()
 logger = logging.getLogger("demo-api")
 
-retrieval_client = RetrievalClient(cfg.retrieval_service_base_url)
-prompt_client = PromptServiceClient(cfg.prompt_service_base_url)
+timeout_config = get_base_config().timeout_config
+retrieval_client = RetrievalClient(cfg.retrieval_service_base_url, timeout=timeout_config.services.retrieval_service)
+prompt_client = PromptServiceClient(cfg.prompt_service_base_url, timeout=timeout_config.services.prompt_service)
 prompt_provider = PromptProvider(prompt_client, cache_ttl_sec=cfg.prompt_cache_ttl_sec)
-agent_client = AgentServiceClient(cfg.agent_service_base_url) if cfg.use_agent_service else None
+agent_client = AgentServiceClient(cfg.agent_service_base_url, timeout=timeout_config.services.agent_service) if cfg.use_agent_service else None
 qa_service = QAService(
 	retrieval_client,
 	prompt_provider,
-	ModelAdapterClient(cfg.model_adapter_base_url),
+	ModelAdapterClient(cfg.model_adapter_base_url, timeout=timeout_config.services.model_adapter),
 	cfg.qa_prompt_key,
 	cfg.provider_hint,
 	top_k=cfg.qa_top_k,
@@ -169,7 +171,8 @@ async def demo_analyze_direct(payload: DemoAnalyzeRequest) -> dict[str, object]:
 		}
 		orchestrator_url = f"{cfg.orchestrator_base_url.rstrip('/')}/orchestrator/analyze"
 		logger.debug("Calling orchestrator", extra={"url": orchestrator_url, "context_id": context_id})
-		async with httpx.AsyncClient(timeout=30.0) as client:
+		timeout = timeout_config.services.orchestrator
+		async with httpx.AsyncClient(timeout=timeout) as client:
 			resp = await client.post(orchestrator_url, json=orchestrator_payload)
 		resp.raise_for_status()
 		body = resp.json()
@@ -227,7 +230,8 @@ async def demo_analyze_result(event_id: str):
 	t0 = perf_counter()
 	try:
 		url = f"{cfg.orchestrator_base_url.rstrip('/')}/orchestrator/runs/{event_id}"
-		async with httpx.AsyncClient(timeout=10.0) as client:
+		timeout = timeout_config.http_default.to_httpx_simple_timeout()
+		async with httpx.AsyncClient(timeout=timeout) as client:
 			resp = await client.get(url)
 		if resp.status_code == 404:
 			raise HTTPException(status_code=404, detail="analysis_not_found")

@@ -2,6 +2,7 @@ import os
 from typing import Dict, Any, Optional
 
 import httpx
+from shared.config.base import get_base_config
 
 BASE = os.getenv("MODEL_ADAPTER_BASE_URL", "http://model-adapter:8000").rstrip("/")
 
@@ -16,7 +17,9 @@ async def llm_generate(
 	prompt: str | None = None,
 	context: str | None = None,
 ) -> Dict[str, Any]:
-	async with httpx.AsyncClient(timeout=30.0) as client:
+	timeout_config = get_base_config().timeout_config
+	timeout = timeout_config.services.model_adapter
+	async with httpx.AsyncClient(timeout=timeout) as client:
 		if prompt_ref:
 			payload: Dict[str, Any] = {
 				"prompt_ref": prompt_ref,

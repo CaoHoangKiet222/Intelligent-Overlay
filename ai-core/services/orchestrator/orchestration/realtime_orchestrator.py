@@ -130,6 +130,10 @@ class RealtimeOrchestrator:
 		return None
 
 
-REALTIME_WORKER_TIMEOUT = float(os.getenv("REALTIME_WORKER_TIMEOUT", "15"))
-REALTIME_ORCHESTRATOR = RealtimeOrchestrator(worker_timeout=REALTIME_WORKER_TIMEOUT)
+from shared.config.base import get_base_config
+
+def _get_realtime_timeout() -> float:
+	return get_base_config().timeout_config.workers.realtime_worker
+
+REALTIME_ORCHESTRATOR = RealtimeOrchestrator(worker_timeout=_get_realtime_timeout())
 
