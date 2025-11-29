@@ -108,14 +108,41 @@ run_service() {
 	
 	if [ ! -d ".venv" ]; then
 		echo "⚠ Virtual environment not found. Creating..."
-		python3.12 -m venv .venv 2>/dev/null || python3 -m venv .venv
+		if command -v python3.12 &> /dev/null; then
+			python3.12 -m venv .venv
+		elif command -v python3.11 &> /dev/null; then
+			python3.11 -m venv .venv
+		elif command -v python3.13 &> /dev/null; then
+			python3.13 -m venv .venv
+		else
+			echo "⚠ Warning: Using system python3 (may be 3.14, langchain may show warnings)"
+			python3 -m venv .venv
+		fi
 	fi
 	
 	source .venv/bin/activate
 	
-	if ! python3 -c "import fastapi" 2>/dev/null; then
-		echo "⚠ Dependencies not installed. Installing..."
+	local req_hash_file=".requirements.hash"
+	local current_hash=""
+	if [ -f "requirements.txt" ]; then
+		current_hash=$(shasum requirements.txt | awk '{print $1}')
+	fi
+	local needs_install=0
+	if [ ! -f "$req_hash_file" ]; then
+		needs_install=1
+	else
+		local saved_hash
+		saved_hash=$(cat "$req_hash_file")
+		if [ "$saved_hash" != "$current_hash" ]; then
+			needs_install=1
+		fi
+	fi
+	if [ "$needs_install" -eq 1 ]; then
+		echo "⚠ Dependencies changed or not installed. Installing..."
 		pip install -q -r requirements.txt
+		if [ -n "$current_hash" ]; then
+			echo "$current_hash" > "$req_hash_file"
+		fi
 	fi
 	
 	export PORT=$port

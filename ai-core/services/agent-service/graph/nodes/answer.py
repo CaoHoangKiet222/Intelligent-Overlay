@@ -6,7 +6,21 @@ FALLBACK_NO_CONTEXT = "Xin lỗi, tôi không tìm thấy đủ thông tin trong
 
 async def node_answer(state: AgentState) -> AgentState:
 	q = state.redacted_query or state.original_query
-	ctx = [r.get("text", "") for r in state.retrieved if r.get("text")]
+	# Extract text from retrieval results - check snippet first, then span.text_preview, then text
+	ctx = []
+	for r in state.retrieved:
+		text = r.get("snippet") or ""
+		if not text:
+			span = r.get("span")
+			if isinstance(span, dict):
+				text = span.get("text_preview") or span.get("text") or ""
+			elif hasattr(span, "text_preview"):
+				text = span.text_preview or ""
+		if not text:
+			text = r.get("text") or ""
+		if text:
+			ctx.append(text)
+	
 	if not ctx and not state.allow_external:
 		state.answer = FALLBACK_NO_CONTEXT
 		state.logs.append("answer: insufficient_context")

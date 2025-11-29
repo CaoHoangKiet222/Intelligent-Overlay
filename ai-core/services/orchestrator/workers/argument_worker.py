@@ -94,14 +94,28 @@ def _parse_claims(output: str) -> List[str]:
 	json_claims = _parse_claims_json(output)
 	if json_claims:
 		return json_claims
+	
 	lines = []
 	for line in output.splitlines():
-		match = CLAIM_PATTERN.match(line.strip())
+		line = line.strip()
+		if not line:
+			continue
+		
+		if line.upper().startswith("ANSWER:") or line.upper().startswith("CITATIONS:") or line.upper().startswith("CONFIDENCE:"):
+			continue
+		
+		match = CLAIM_PATTERN.match(line)
 		if match:
-			lines.append(match.group(1).strip())
+			claim_text = match.group(1).strip()
+			if len(claim_text.split()) >= 4:
+				lines.append(claim_text)
+	
 	if not lines and output:
-		lines = [output.strip()]
-	return [claim for claim in lines if len(claim.split()) >= 4]
+		cleaned = output.strip()
+		if not cleaned.upper().startswith("ANSWER:"):
+			lines = [cleaned]
+	
+	return [claim for claim in lines if len(claim.split()) >= 4] if lines else []
 
 
 def _parse_claims_json(output: str) -> List[str]:
@@ -199,7 +213,21 @@ def _parse_reasoning_output(raw: str) -> Dict[str, object]:
 			return data
 	except json.JSONDecodeError:
 		pass
-	return {"reasoning": raw.strip()}
+	
+	cleaned = raw.strip()
+	if cleaned.upper().startswith("ANSWER:") or cleaned.upper().startswith("CITATIONS:") or cleaned.upper().startswith("CONFIDENCE:"):
+		lines = cleaned.splitlines()
+		reasoning_parts = []
+		for line in lines:
+			line = line.strip()
+			if line.upper().startswith("REASONING:"):
+				reasoning_parts.append(line.split(":", 1)[1].strip())
+			elif not line.upper().startswith(("ANSWER:", "CITATIONS:", "CONFIDENCE:")):
+				reasoning_parts.append(line)
+		if reasoning_parts:
+			return {"reasoning": " ".join(reasoning_parts)}
+	
+	return {"reasoning": cleaned}
 
 
 def _confidence_from_evidence(spans: Sequence[SpanRef], reasoning: str, reasoning_conf: float | None) -> float:

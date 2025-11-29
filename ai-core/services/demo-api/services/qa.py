@@ -1,26 +1,74 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Tuple, Any
+import logging
+from typing import Dict, List, Tuple, Any, Optional
 from domain.schemas import DemoQAResponse, SpanRef
 from clients.retrieval import RetrievalClient
 from clients.model_adapter import ModelAdapterClient
+from clients.agent_service import AgentServiceClient
 from services.prompt_bootstrap import PromptProvider
 from services.analysis import SEG_PATTERN
 from metrics.prometheus import worker_counter
 
 
+logger = logging.getLogger(__name__)
+
+
 class QAService:
-	def __init__(self, retrieval_client: RetrievalClient, prompt_provider: PromptProvider, model_client: ModelAdapterClient,
-	             qa_prompt_key: str, provider_hint: str, top_k: int = 4):
+	def __init__(
+		self,
+		retrieval_client: RetrievalClient,
+		prompt_provider: PromptProvider,
+		model_client: ModelAdapterClient,
+		qa_prompt_key: str,
+		provider_hint: str,
+		top_k: int = 4,
+		agent_client: Optional[AgentServiceClient] = None,
+		use_agent_service: bool = False,
+	):
 		self._retrieval = retrieval_client
 		self._prompt_provider = prompt_provider
 		self._model_client = model_client
 		self._qa_prompt_key = qa_prompt_key
 		self._provider_hint = provider_hint
 		self._top_k = top_k
+		self._agent_client = agent_client
+		self._use_agent_service = use_agent_service
 
-	async def answer(self, context_id: str, query: str, locale: str | None) -> DemoQAResponse:
+	async def answer(self, context_id: str, query: str, locale: str | None, conversation_id: str | None = None) -> DemoQAResponse:
+		if self._use_agent_service and self._agent_client:
+			try:
+				logger.debug("Using agent-service for QA", extra={"context_id": context_id, "query": query[:100]})
+				agent_resp = await self._agent_client.qa(
+					context_id=context_id,
+					query=query,
+					conversation_id=conversation_id,
+					language=locale,
+					allow_external=False,
+				)
+				citations: List[SpanRef] = []
+				for cite in agent_resp.get("citations", []):
+					if isinstance(cite, dict):
+						try:
+							citations.append(SpanRef.model_validate(cite))
+						except Exception:
+							logger.warning("Failed to parse citation from agent-service", extra={"citation": cite})
+					elif isinstance(cite, SpanRef):
+						citations.append(cite)
+				
+				return DemoQAResponse(
+					answer=agent_resp.get("answer", ""),
+					citations=citations,
+					confidence=float(agent_resp.get("confidence", 0.5)),
+				)
+			except Exception as exc:
+				logger.warning(
+					"Agent-service failed, falling back to direct QA",
+					extra={"error": str(exc), "context_id": context_id},
+					exc_info=True,
+				)
+		
 		search = await self._retrieval.search(context_id=context_id, query=query, top_k=self._top_k)
 		context_text, lookup = _build_context_from_results(search.get("results") or [])
 		if not lookup:

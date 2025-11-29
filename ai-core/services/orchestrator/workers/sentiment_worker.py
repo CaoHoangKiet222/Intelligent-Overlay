@@ -138,18 +138,33 @@ async def _generate_implications(
 def _parse_implication_output(output: str, chunks: Sequence[ContextChunk]) -> List[ImplicationItem]:
 	if not output:
 		return []
+	
 	chunk_lookup = {chunk.chunk_id.lower(): chunk for chunk in chunks}
-	json_items = _parse_implication_json(output, chunk_lookup, chunks)
+	
+	cleaned_output = output.strip()
+	if cleaned_output.upper().startswith("IMPLICATIONS:"):
+		cleaned_output = "\n".join(cleaned_output.splitlines()[1:])
+	
+	json_items = _parse_implication_json(cleaned_output, chunk_lookup, chunks)
 	if json_items:
 		return json_items
+	
 	items: List[ImplicationItem] = []
-	for line in output.splitlines():
+	for line in cleaned_output.splitlines():
 		trimmed = line.strip()
-		if not trimmed or trimmed[0] not in "-•0123456789":
+		if not trimmed:
 			continue
+		
+		if trimmed.upper().startswith("SENTIMENT:"):
+			continue
+		
+		if trimmed[0] not in "-•0123456789":
+			continue
+		
 		text_part = trimmed.lstrip("-•0123456789. ").strip()
 		if not text_part:
 			continue
+		
 		span_ids = SEG_PATTERN.findall(text_part)
 		clean_text = SEG_MARKER.sub("", text_part).strip()
 		spans = [_span_for_id(span_id, chunk_lookup) for span_id in span_ids]
@@ -158,6 +173,7 @@ def _parse_implication_output(output: str, chunks: Sequence[ContextChunk]) -> Li
 			spans = [chunks[0].as_span()]
 		confidence = round(min(0.9, 0.6 + 0.05 * len(spans)), 2)
 		items.append(ImplicationItem(text=_trim_words(clean_text, 22), spans=spans, confidence=confidence))
+	
 	return items
 
 

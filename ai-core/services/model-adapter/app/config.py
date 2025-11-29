@@ -27,6 +27,7 @@ class AppConfig:
 			"qa": "openai",
 			"argument": "anthropic",
 			"logic_bias": "anthropic",
+			"sentiment": "openai",
 		}
 		for k, v in default_map.items():
 			task_map.setdefault(k, v)

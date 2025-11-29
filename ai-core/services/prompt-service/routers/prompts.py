@@ -1,3 +1,5 @@
+import uuid
+from urllib.parse import unquote
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Optional, Dict, Any
 from domain.schemas import PromptCreate, PromptVersionCreate
@@ -55,31 +57,57 @@ async def create_version(prompt_id: str, payload: PromptVersionCreate,
 	return {"id": str(pv.id), "version": pv.version}
 
 
+def _is_uuid(s: str) -> bool:
+	try:
+		uuid.UUID(s)
+		return True
+	except (ValueError, AttributeError):
+		return False
+
+
 @router.get("/{prompt_id}")
 async def get_prompt(prompt_id: str, version: Optional[int] = Query(default=None),
                      repo: PromptRepo = Depends(get_repo_dep),
                      cache: PromptCache = Depends(get_cache_dep)) -> Dict[str, Any]:
+	prompt_id = unquote(prompt_id)
+	prompt_key: str | None = None
+	actual_prompt_id: str | None = None
+
+	if prompt_id.startswith("key:"):
+		prompt_key = prompt_id[4:]
+		pr = await repo.get_prompt_by_key(prompt_key)
+		if not pr:
+			raise HTTPException(status_code=404, detail=f"prompt not found for key: {prompt_key}")
+		actual_prompt_id = str(pr.id)
+	elif _is_uuid(prompt_id):
+		actual_prompt_id = prompt_id
+		pr = await repo.get_prompt_by_id(actual_prompt_id)
+		if not pr:
+			raise HTTPException(status_code=404, detail="prompt not found")
+	else:
+		prompt_key = prompt_id
+		pr = await repo.get_prompt_by_key(prompt_key)
+		if not pr:
+			raise HTTPException(status_code=404, detail=f"prompt not found for key: {prompt_key}")
+		actual_prompt_id = str(pr.id)
+
 	if version is None:
-		pv = await repo.get_latest_version(prompt_id)
+		pv = await repo.get_latest_version(actual_prompt_id)
 		if not pv:
 			raise HTTPException(status_code=404, detail="prompt version not found")
 		version = pv.version
 
-	cached = await cache.get(prompt_id, version)
+	cached = await cache.get(actual_prompt_id, version)
 	if cached:
 		prompt_cache_hit.inc()
 		return cached
 
-	pr = await repo.get_prompt_by_id(prompt_id)
-	if not pr:
-		raise HTTPException(status_code=404, detail="prompt not found")
-
-	pv = await repo.get_version(prompt_id, version)
+	pv = await repo.get_version(actual_prompt_id, version)
 	if not pv:
 		raise HTTPException(status_code=404, detail="prompt version not found")
 
 	result = _build_payload(pr, pv)
-	await cache.set(prompt_id, version, result)
+	await cache.set(actual_prompt_id, version, result)
 	prompt_cache_miss.inc()
 	return result
 

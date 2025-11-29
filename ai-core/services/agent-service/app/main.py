@@ -2,6 +2,8 @@ from time import perf_counter
 import os
 import logging
 import uvicorn
+import json
+from typing import Any, Dict
 from fastapi import FastAPI, HTTPException
 from domain.schemas import AskRequest, AskResponse, QaRequest, QaResponse
 from domain.state import AgentState
@@ -16,13 +18,41 @@ graph = build_graph()
 
 async def _execute_graph(state: AgentState) -> AgentState:
 	t0 = perf_counter()
-	out = await graph.ainvoke(state)
+	try:
+		out_dict = await graph.ainvoke(state)
+		# LangGraph returns AddableValuesDict, convert to AgentState
+		if isinstance(out_dict, dict):
+			out = AgentState.model_validate(out_dict)
+		else:
+			out = out_dict
+	except Exception as e:
+		logger.error(
+			"graph_execution_error",
+			extra={
+				"error_type": type(e).__name__,
+				"error_message": str(e),
+				"state_query": state.original_query,
+				"state_context_id": state.context_id,
+				"state_language": state.language,
+			},
+			exc_info=True,
+		)
+		raise
+	
 	took = int((perf_counter() - t0) * 1000)
 	latency.observe(took)
-	if out.plan.get("intent") == "tool" and out.tool_result and "error" in out.tool_result:
-		tool_errors.inc()
-	if out.logs and any("fallback: used" in x for x in out.logs):
+	
+	# Safely access plan attribute
+	plan = getattr(out, "plan", {}) or {}
+	if isinstance(plan, dict) and plan.get("intent") == "tool":
+		tool_result = getattr(out, "tool_result", None)
+		if tool_result and isinstance(tool_result, dict) and "error" in tool_result:
+			tool_errors.inc()
+	
+	logs = getattr(out, "logs", []) or []
+	if logs and any("fallback: used" in str(x) for x in logs):
 		fallback_used.inc()
+	
 	return out
 
 
@@ -42,18 +72,39 @@ def create_app() -> FastAPI:
 		)
 		try:
 			out = await _execute_graph(state)
-			answer = out.answer or "Xin lỗi, tôi không tìm thấy đủ thông tin trong ngữ cảnh được cung cấp."
-			confidence = estimate_confidence(out.retrieved, answer)
+			answer = getattr(out, "answer", None) or "Xin lỗi, tôi không tìm thấy đủ thông tin trong ngữ cảnh được cung cấp."
+			retrieved = getattr(out, "retrieved", []) or []
+			confidence = estimate_confidence(retrieved, answer)
+			citations = getattr(out, "citations", []) or []
+			used_external = getattr(out, "used_external", False)
+			
 			return QaResponse(
 				conversation_id=req.conversation_id,
 				answer=answer,
-				citations=out.citations,
+				citations=citations,
 				confidence=confidence,
-				used_external=out.used_external,
+				used_external=used_external,
 			)
+		except HTTPException:
+			raise
 		except Exception as exc:
-			logger.error("qa_error", exc_info=exc)
-			raise HTTPException(status_code=500, detail="qa_failed") from exc
+			logger.error(
+				"qa_error",
+				extra={
+					"error_type": type(exc).__name__,
+					"error_message": str(exc),
+					"request_query": req.query,
+					"request_context_id": req.context_id,
+					"request_conversation_id": req.conversation_id,
+					"request_language": req.language,
+					"request_allow_external": req.allow_external,
+				},
+				exc_info=True,
+			)
+			raise HTTPException(
+				status_code=500,
+				detail=f"qa_failed: {type(exc).__name__}: {str(exc)}"
+			) from exc
 
 	@application.post("/agent/ask", response_model=AskResponse)
 	async def ask(req: AskRequest):
@@ -68,16 +119,32 @@ def create_app() -> FastAPI:
 		try:
 			out = await _execute_graph(state)
 			return AskResponse(
-				session_id=out.session_id,
-				answer=out.answer or "",
-				citations=out.citations,
-				plan=out.plan,
-				tool_result=out.tool_result,
-				logs=out.logs,
+				session_id=getattr(out, "session_id", None),
+				answer=getattr(out, "answer", None) or "",
+				citations=getattr(out, "citations", []) or [],
+				plan=getattr(out, "plan", {}) or {},
+				tool_result=getattr(out, "tool_result", None),
+				logs=getattr(out, "logs", []) or [],
 			)
-		except Exception as exc:
-			logger.error("ask_error", exc_info=exc)
-			raise HTTPException(status_code=500, detail="ask_failed") from exc
+		except HTTPException:
+			raise
+		except Exception as e:
+			logger.error(
+				"ask_error",
+				extra={
+					"error_type": type(e).__name__,
+					"error_message": str(e),
+					"request_query": req.query,
+					"request_session_id": req.session_id,
+					"request_language": req.language,
+					"request_meta": json.dumps(req.meta) if req.meta else None,
+				},
+				exc_info=True,
+			)
+			raise HTTPException(
+				status_code=500,
+				detail=f"ask_failed: {type(e).__name__}: {str(e)}"
+			) from e
 
 	@application.get("/healthz")
 	async def healthz():

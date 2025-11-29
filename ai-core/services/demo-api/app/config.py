@@ -7,6 +7,8 @@ class DemoConfig:
 		self.prompt_service_base_url = os.getenv("PROMPT_SERVICE_BASE_URL", "http://prompt-service:8000")
 		self.retrieval_service_base_url = os.getenv("RETRIEVAL_SERVICE_BASE_URL", "http://retrieval-service:8000")
 		self.orchestrator_base_url = os.getenv("ORCHESTRATOR_BASE_URL", "http://orchestrator:8000")
+		self.agent_service_base_url = os.getenv("AGENT_SERVICE_BASE_URL", "http://agent-service:8000")
+		self.use_agent_service = os.getenv("USE_AGENT_SERVICE", "true").lower() == "true"
 		self.kafka_bootstrap = os.getenv("KAFKA_BOOTSTRAP", "broker:9092")
 		self.topic_tasks = os.getenv("TOPIC_TASKS", "analysis.tasks")
 		self.context_segment_limit = int(os.getenv("CONTEXT_SEGMENT_LIMIT", "12"))

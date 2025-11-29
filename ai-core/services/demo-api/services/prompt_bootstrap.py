@@ -50,17 +50,75 @@ DEFAULT_PROMPTS: List[PromptDefinition] = [
 		),
 	),
 	PromptDefinition(
-		key="demo.implication.v1",
-		name="Demo Implication & Sentiment Prompt",
-		description="Implications plus sentiment classification",
+		key="demo.argument.claims.v1",
+		name="Demo Argument Claims Prompt",
+		description="Extract claims from context with segment markers",
 		variables={"required": ["context"], "optional": []},
 		template=(
-			"Read the context with segment markers.\n"
-			"Output format:\n"
-			"IMPLICATIONS:\n"
-			"1. text ... [seg:UUID]\n"
-			"2. ... (up to 2 items)\n"
-			"SENTIMENT: <positive|neutral|negative|mixed> - explanation with [seg:UUID]\n"
+			"You are an expert analyst. Extract key claims from the context below.\n"
+			"Context contains segment markers like [seg:UUID].\n\n"
+			"Requirements:\n"
+			"- Extract 3-7 distinct claims\n"
+			"- Each claim must be on a separate line\n"
+			"- Start each line with a dash and space: \"- \"\n"
+			"- Include segment markers [seg:UUID] when referencing specific parts\n"
+			"- Do NOT use ANSWER:, CITATIONS:, or CONFIDENCE: format\n"
+			"- Return ONLY the list of claims, one per line\n\n"
+			"Example format:\n"
+			"- First claim with [seg:abc-123] reference\n"
+			"- Second claim with [seg:def-456] reference\n"
+			"- Third claim\n\n"
+			"Context:\n{{ context }}"
+		),
+	),
+	PromptDefinition(
+		key="demo.argument.reasoning.v1",
+		name="Demo Argument Reasoning Prompt",
+		description="Generate reasoning for claims with evidence",
+		variables={"required": ["context", "claim", "evidence"], "optional": []},
+		template=(
+			"You are an expert analyst. Provide reasoning that connects the claim to the evidence.\n\n"
+			"Claim: {{ claim }}\n\n"
+			"Evidence:\n{{ evidence }}\n\n"
+			"Context:\n{{ context }}\n\n"
+			"Requirements:\n"
+			"- Provide a logical explanation connecting the claim to the evidence\n"
+			"- Use segment markers [seg:UUID] when citing specific parts\n"
+			"- Do NOT use ANSWER:, CITATIONS:, or CONFIDENCE: format\n"
+			"- Return ONLY the reasoning text (2-4 sentences)\n\n"
+			"Output format: Just the reasoning text, nothing else."
+		),
+	),
+	PromptDefinition(
+		key="demo.implication.v1",
+		name="Demo Implication Prompt",
+		description="Extract implications from context",
+		variables={"required": ["context"], "optional": []},
+		template=(
+			"You are an expert analyst. Extract implications from the context below.\n"
+			"Context contains segment markers like [seg:UUID].\n\n"
+			"Requirements:\n"
+			"- Extract 2-4 key implications\n"
+			"- Each implication must be on a separate line\n"
+			"- Start each line with a number and period: \"1. \", \"2. \", etc.\n"
+			"- Include segment markers [seg:UUID] when referencing specific parts\n"
+			"- Do NOT include SENTIMENT in your response\n"
+			"- Return ONLY the implications list\n\n"
+			"Example format:\n"
+			"1. First implication with [seg:abc-123] reference\n"
+			"2. Second implication with [seg:def-456] reference\n\n"
+			"Context:\n{{ context }}"
+		),
+	),
+	PromptDefinition(
+		key="demo.sentiment.v1",
+		name="Demo Sentiment Classification Prompt",
+		description="Classify sentiment of the context",
+		variables={"required": ["context"], "optional": []},
+		template=(
+			"Analyze the sentiment of the following context.\n"
+			"Output format (JSON):\n"
+			'{"label": "positive|neutral|negative|mixed", "score": 0.0-1.0, "explanation": "brief explanation"}\n'
 			"Context:\n{{ context }}"
 		),
 	),

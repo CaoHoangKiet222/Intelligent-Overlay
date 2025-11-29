@@ -50,15 +50,16 @@ services:
   broker:
     image: confluentinc/cp-kafka:7.5.0
     container_name: ai_core_kafka
-    depends_on:
-      zookeeper:
-        condition: service_healthy
     ports:
       - "${KAFKA_PORT:-9092}:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:9092,PLAINTEXT_INTERNAL://broker:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: >
+        PLAINTEXT://host.docker.internal:9092,
+        PLAINTEXT_INTERNAL://broker:29092
+
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -103,9 +104,10 @@ services:
     shm_size: "6gb"
     container_name: ai_core_ray_head
     command: >
-      bash -lc "ray start --head --dashboard-host=0.0.0.0 --port=6379 --dashboard-port=8265 --disable-usage-stats --include-dashboard=true && tail -f /dev/null"
+      bash -lc "ray start --head --dashboard-host=0.0.0.0 --port=6380 --dashboard-port=8265 --disable-usage-stats --include-dashboard=true && tail -f /dev/null"
     ports:
       - "8265:8265"
+      - "6380:6380"
     networks:
       - ai_core_network
     healthcheck:
@@ -122,7 +124,7 @@ services:
     depends_on:
       ray-head:
         condition: service_healthy
-    command: bash -lc "ray start --address=ray-head:6379 --disable-usage-stats && tail -f /dev/null"
+    command: bash -lc "ray start --address=ray-head:6380 --disable-usage-stats && tail -f /dev/null"
     networks:
       - ai_core_network
 
@@ -224,7 +226,7 @@ services:
     container_name: ai_core_orchestrator
     environment:
       PORT: 8000
-      RAY_ADDRESS: ray-head:6379
+      RAY_ADDRESS: ray-head:6380
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP:-broker:9092}
       KAFKA_GROUP: ${KAFKA_GROUP:-aicore-orchestrator}
