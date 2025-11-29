@@ -5,6 +5,7 @@
 - Docker + Docker Compose (khuyến nghị)
 - Python 3.11+ (nếu chạy local từng service)
 - Kafka (nếu chạy orchestrator service local - có thể dùng Docker: `docker compose up zookeeper broker -d`)
+- NVIDIA GPU với CUDA (khuyến nghị cho Ollama, có thể chạy CPU-only nhưng chậm hơn)
 
 ## Khởi động toàn bộ bằng Docker Compose
 
@@ -18,6 +19,7 @@
 
 3. Kiểm tra health:
 
+- Ollama: `curl http://localhost:11434/api/tags` (hoặc `docker logs ai_core_ollama_init` để xem models đã được preload)
 - Model Adapter: `curl http://localhost:8081/healthz`
 - Prompt Service: `curl http://localhost:8082/healthz`
 - Retrieval Service: `curl http://localhost:8083/healthz`
@@ -25,7 +27,20 @@
 - Orchestrator: `curl http://localhost:8085/healthz`
 - Kafka: `docker exec ai_core_kafka kafka-broker-api-versions --bootstrap-server localhost:9092`
 
-4. Migrations (nếu cần):
+4. Kiểm tra Ollama models đã được preload:
+
+```bash
+# Xem logs của ollama-init service
+docker logs ai_core_ollama_init
+
+# Kiểm tra models có sẵn
+curl http://localhost:11434/api/tags
+
+# Kiểm tra model-adapter có thể giao tiếp với Ollama
+curl http://localhost:8081/providers
+```
+
+5. Migrations (nếu cần):
 
 - Prompt/Retrieval/Orchestrator dùng schema từ P2/P6. Chạy Alembic tại thư mục migrations tương ứng hoặc tại `ai-core/db`:
 - `cd ai-core/db`
@@ -36,14 +51,71 @@
 
 ## Services
 
-- Model Adapter (FastAPI): `ai-core/services/model-adapter` (POST /generate, POST /embed, GET /providers) - Port 8081
-- Prompt Service (FastAPI): `ai-core/services/prompt-service` (CRUD prompt/version + cache) - Port 8082
-- Retrieval Service (FastAPI): `ai-core/services/retrieval-service` (POST /ingest, POST /search) - Port 8083
-- Agent Service (FastAPI + LangGraph): `ai-core/services/agent-service` (POST /agent/ask) - Port 8084
-- Orchestrator (Kafka + Ray + FastAPI): `ai-core/services/orchestrator` - Port 8085
-- Demo API (FastAPI): `ai-core/services/demo-api` (POST /demo/analyze, POST /demo/qa) - Port 8090
+- **Ollama** (LLM Runtime): Local LLM inference server với OpenAI-compatible API - Port 11434
+  - Tự động preload các models: `phi3:mini`, `bge-micro`
+  - Models được tối ưu cho GPU 4GB
+  - Base URL: `http://ollama:11434/api` (internal) hoặc `http://localhost:11434/api` (external)
+- **Model Adapter** (FastAPI): `ai-core/services/model-adapter` (POST /generate, POST /embed, GET /providers) - Port 8081
+  - Hỗ trợ nhiều providers: OpenAI, Anthropic, Mistral, **Ollama**
+  - Ollama provider sử dụng OpenAI-compatible API endpoint
+- **Prompt Service** (FastAPI): `ai-core/services/prompt-service` (CRUD prompt/version + cache) - Port 8082
+- **Retrieval Service** (FastAPI): `ai-core/services/retrieval-service` (POST /ingest, POST /search) - Port 8083
+  - Sử dụng Ollama embeddings (bge-micro, 384 dim) mặc định
+- **Agent Service** (FastAPI + LangGraph): `ai-core/services/agent-service` (POST /agent/ask) - Port 8084
+- **Orchestrator** (Kafka + Ray + FastAPI): `ai-core/services/orchestrator` - Port 8085
+- **Demo API** (FastAPI): `ai-core/services/demo-api` (POST /demo/analyze, POST /demo/qa) - Port 8090
 
 Mỗi service có README riêng hướng dẫn chạy local và endpoints.
+
+## Cấu hình Ollama
+
+### Models được sử dụng
+
+- **phi3:mini**: Model chính cho generation tasks (~2.3GB), chất lượng tốt cho general purpose
+- **qwen2.5:1.5b**: Model chất lượng cao cho các tasks phức tạp, tốt cho reasoning
+- **qwen2.5:0.5b**: Model siêu nhẹ cho classification và simple tasks, rất nhanh
+- **bge-micro**: Embedding model nhỏ gọn (384 dim), phù hợp cho retrieval và semantic search
+
+### Cấu hình môi trường
+
+Tạo file `.env` từ `.env.example` và cấu hình:
+
+```bash
+# Ollama Configuration
+OLLAMA_BASE_URL=http://ollama:11434/api
+OLLAMA_GENERATION_MODEL=phi3:mini
+OLLAMA_EMBEDDING_MODEL=bge-micro
+
+# Model Adapter - Sử dụng Ollama làm provider mặc định
+PROVIDER_KEYS={"ollama":"ollama"}
+TASK_ROUTING={"summary":"ollama","qa":"ollama","argument":"ollama","logic_bias":"ollama","sentiment":"ollama"}
+
+# Retrieval Service - Sử dụng Ollama embeddings
+EMBED_MODEL_HINT=ollama
+EMBEDDING_DIM=384
+```
+
+### Chạy Ollama riêng lẻ
+
+Nếu chỉ muốn chạy Ollama service:
+
+```bash
+# Chạy Ollama và preload models
+docker compose up -d ollama ollama-init
+
+# Xem logs
+docker logs -f ai_core_ollama_init
+
+# Test Ollama API
+curl http://localhost:11434/api/tags
+```
+
+### Chạy không có GPU
+
+Nếu không có NVIDIA GPU, có thể chạy Ollama trên CPU (chậm hơn):
+
+1. Sửa `docker-compose.yaml`, bỏ phần `deploy.resources` trong service `ollama`
+2. Hoặc set environment variable: `OLLAMA_NUM_GPU=0`
 
 ## Chạy và kiểm tra services
 

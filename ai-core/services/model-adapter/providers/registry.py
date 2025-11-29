@@ -18,7 +18,12 @@ class ProviderRegistry:
 		providers["openai"] = OpenAIProvider(cfg.provider_keys.get("openai", ""))
 		providers["anthropic"] = AnthropicProvider(cfg.provider_keys.get("anthropic", ""))
 		providers["mistral"] = MistralProvider(cfg.provider_keys.get("mistral", ""))
-		providers["ollama"] = OllamaProvider(cfg.provider_keys.get("ollama", ""))
+		providers["ollama"] = OllamaProvider(
+			api_key=cfg.provider_keys.get("ollama", "ollama"),
+			base_url=cfg.ollama_base_url,
+			generation_model=cfg.ollama_generation_model,
+			embedding_model=cfg.ollama_embedding_model,
+		)
 		return ProviderRegistry(providers)
 
 	def get(self, name: str) -> BaseProvider:

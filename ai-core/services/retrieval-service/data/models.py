@@ -3,8 +3,11 @@ from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
 import uuid
+import os
 from .db import Base
 import enum
+
+EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", "1536"))
 
 
 class SourceType(str, enum.Enum):
@@ -63,7 +66,7 @@ class Embedding(Base):
 	model = Column(String(64), nullable=False)
 	dim = Column(Integer, nullable=False)
 	created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
-	vector = Column(Vector(1536), nullable=False)
+	vector = Column(Vector(EMBEDDING_DIM), nullable=False)
 	__table_args__ = (CheckConstraint("dim > 0", name="ck_embeddings_dim_positive"),)
 
 

@@ -1,6 +1,45 @@
 version: "3.9"
 
 services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai_core_ollama
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - ai_core_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ollama-init:
+    image: curlimages/curl:latest
+    container_name: ai_core_ollama_init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    networks:
+      - ai_core_network
+    volumes:
+      - ./scripts/ollama-init.sh:/ollama-init.sh:ro
+    entrypoint: ["/bin/sh", "/ollama-init.sh"]
+    restart: "no"
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: ai_core_postgres
@@ -140,12 +179,17 @@ services:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       PROVIDER_KEYS: ${PROVIDER_KEYS:-{}}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434/api}
+      OLLAMA_GENERATION_MODEL: ${OLLAMA_GENERATION_MODEL:-phi3:mini}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-bge-micro}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     ports:
       - "8081:8000"
@@ -283,6 +327,7 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  ollama_data:
 
 networks:
   ai_core_network:
