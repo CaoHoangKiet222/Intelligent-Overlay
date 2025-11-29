@@ -1,7 +1,5 @@
 import httpx
-import os
-
-MODEL_ADAPTER_BASE_URL = os.getenv("MODEL_ADAPTER_BASE_URL", "http://model-adapter:8000")
+from app.config import MODEL_ADAPTER_BASE_URL
 
 async def generate(payload: dict) -> dict:
 	async with httpx.AsyncClient(timeout=30.0) as client:

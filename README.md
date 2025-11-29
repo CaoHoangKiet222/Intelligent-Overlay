@@ -11,7 +11,8 @@
 
 1. Sao chép file env mẫu (tùy chọn):
 
-- `cp ai-core/env.example .env` (hoặc tự đặt biến môi trường)
+- `cp ai-core/shared/config/ENV_EXAMPLE.md .env` (hoặc tự đặt biến môi trường)
+- Xem `ai-core/shared/config/README.md` để biết chi tiết về centralized configuration
 
 2. Chạy:
 

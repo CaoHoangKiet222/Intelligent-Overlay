@@ -14,8 +14,9 @@ from workers.logic_bias_worker import run_logic_bias
 from orchestration.aggregator import aggregate
 from data.repositories import LlmCallRepo, AnalysisRunRepo, IdempotencyRepo
 from metrics.prometheus import observe_task_latency_ms, worker_failures, fanin_partial, dlq_counter
+from app.config import WORKER_TIMEOUT_SEC
 
-WORKER_TIMEOUT = int(os.getenv("WORKER_TIMEOUT_SEC", "20"))
+WORKER_TIMEOUT = WORKER_TIMEOUT_SEC
 
 
 class OrchestratorService:

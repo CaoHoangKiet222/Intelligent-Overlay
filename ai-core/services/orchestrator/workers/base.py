@@ -1,11 +1,10 @@
-import os
 from typing import Dict, Any
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import httpx
 from domain.errors import TransientHTTPError
+from app.config import WORKER_MAX_RETRY, MODEL_ADAPTER_BASE_URL
 
-WORKER_MAX_RETRY = int(os.getenv("WORKER_MAX_RETRY", "2"))
-MODEL_ADAPTER = os.getenv("MODEL_ADAPTER_BASE_URL", "http://model-adapter:8000")
+MODEL_ADAPTER = MODEL_ADAPTER_BASE_URL
 
 
 @retry(

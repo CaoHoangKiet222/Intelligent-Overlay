@@ -1,12 +1,21 @@
-import os
+import sys
+from pathlib import Path
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://ai:ai@postgres:5432/ai_core")
-MODEL_ADAPTER_BASE_URL = os.getenv("MODEL_ADAPTER_BASE_URL", "http://model-adapter:8000")
-EMBED_MODEL_HINT = os.getenv("EMBED_MODEL_HINT", "qwen3-embedding:0.6b")
-EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", "1024"))
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
-SEARCH_ALPHA = float(os.getenv("SEARCH_ALPHA", "0.7"))
-VEC_CANDIDATES = int(os.getenv("VEC_CANDIDATES", "100"))
-TRGM_CANDIDATES = int(os.getenv("TRGM_CANDIDATES", "200"))
-TOP_K = int(os.getenv("TOP_K", "10"))
+ai_core_path = Path(__file__).parent.parent.parent.parent
+if str(ai_core_path) not in sys.path:
+	sys.path.insert(0, str(ai_core_path))
+
+from shared.config.service_configs import RetrievalServiceConfig
+
+_config = RetrievalServiceConfig.from_env()
+
+DATABASE_URL = _config.database_url
+MODEL_ADAPTER_BASE_URL = _config.model_adapter_base_url
+EMBED_MODEL_HINT = _config.embed_model_hint
+EMBEDDING_DIM = _config.embedding_dim
+REDIS_URL = _config.redis_url
+SEARCH_ALPHA = _config.search_alpha
+VEC_CANDIDATES = _config.vec_candidates
+TRGM_CANDIDATES = _config.trgm_candidates
+TOP_K = _config.top_k
 

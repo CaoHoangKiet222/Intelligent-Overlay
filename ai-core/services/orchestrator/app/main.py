@@ -19,6 +19,7 @@ from shared.telemetry.otel import init_otel
 from shared.telemetry.logger import setup_json_logger
 from routers.workers import router as workers_router
 from routers.orchestrators import router as orchestrator_router
+from shared.config.service_configs import OrchestratorServiceConfig
 
 
 setup_json_logger()
@@ -26,7 +27,8 @@ setup_json_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-	ray_addr = os.getenv("RAY_ADDRESS", "")
+	config = OrchestratorServiceConfig.from_env()
+	ray_addr = config.ray_address
 	# Check if Ray is already initialized
 	if not ray.is_initialized():
 		# If RAY_ADDRESS is set to a specific address (not "auto" or empty), connect to it
@@ -35,8 +37,8 @@ async def lifespan(app: FastAPI):
 		else:
 			# Initialize local Ray instance (for "auto" or empty, start new local instance)
 			ray.init(
-				num_cpus=int(os.getenv("RAY_NUM_CPUS", "2")),
-				num_gpus=int(os.getenv("RAY_NUM_GPUS", "0")),
+				num_cpus=config.ray_num_cpus,
+				num_gpus=config.ray_num_gpus,
 				ignore_reinit_error=True
 			)
 	app.state.dlq = DlqProducer()

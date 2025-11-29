@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import os
 from typing import Dict, List, Mapping, Sequence, Tuple, Union
 
 import httpx
 from shared.contracts import ContextChunk, SpanRef
+from shared.config.base import get_base_config
 
-RETRIEVAL_SERVICE_BASE_URL = os.getenv("RETRIEVAL_SERVICE_BASE_URL", "http://retrieval-service:8000")
+_retrieval_base = get_base_config()
+RETRIEVAL_SERVICE_BASE_URL = _retrieval_base.retrieval_service_base_url
 
 
 def normalize_chunks(segments: Sequence[Union[ContextChunk, Mapping[str, object]]]) -> List[ContextChunk]:

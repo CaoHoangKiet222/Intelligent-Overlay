@@ -1,7 +1,5 @@
 import httpx
-import os
-
-PROMPT_SERVICE_BASE_URL = os.getenv("PROMPT_SERVICE_BASE_URL", "http://prompt-service:8000")
+from app.config import PROMPT_SERVICE_BASE_URL
 
 async def get_prompt(prompt_id: str) -> dict:
 	async with httpx.AsyncClient(timeout=15.0) as client:
