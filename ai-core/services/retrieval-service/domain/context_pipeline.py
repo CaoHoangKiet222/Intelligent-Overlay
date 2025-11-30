@@ -14,6 +14,7 @@ from data.repositories import (
 )
 from app.config import EMBEDDING_DIM
 from domain.segmentation import segment_text
+from domain.vector_utils import expand_vector_to_max_dim
 
 
 def normalize_text(raw: str) -> str:
@@ -126,7 +127,7 @@ class NormalizeAndIndexService:
 					dimension = len(batch_vectors_raw[0])
 			if dimension is None:
 				dimension = EMBEDDING_DIM
-			batch_vectors = [self._coerce_vector(vec, dimension) for vec in batch_vectors_raw]
+			batch_vectors = [expand_vector_to_max_dim(vec, dimension) for vec in batch_vectors_raw]
 			if not batch_vectors:
 				raise ValueError("embedding_vectors_missing")
 			vectors.extend(batch_vectors)
@@ -137,15 +138,6 @@ class NormalizeAndIndexService:
 			raise ValueError("embedding_metadata_missing")
 		return vectors, model_name, dimension
 
-	@staticmethod
-	def _coerce_vector(vector: Sequence[float], target_dim: int) -> List[float]:
-		float_vec = [float(v) for v in vector]
-		if len(float_vec) == target_dim:
-			return float_vec
-		if len(float_vec) > target_dim:
-			return float_vec[:target_dim]
-		padding = [0.0] * (target_dim - len(float_vec))
-		return float_vec + padding
 
 
 def _batched(items: Sequence[str], size: int) -> Iterable[Sequence[str]]:

@@ -86,7 +86,28 @@ def create_app() -> FastAPI:
 				used_external=used_external,
 			)
 		except HTTPException:
-			raise
+			raise HTTPException(
+				status_code=500,
+				detail="qa_failed: HTTPException"
+			) from exc
+		except TimeoutError as exc:
+			logger.error(
+				"qa_timeout",
+				extra={
+					"error_type": type(exc).__name__,
+					"error_message": str(exc),
+					"request_query": req.query,
+					"request_context_id": req.context_id,
+					"request_conversation_id": req.conversation_id,
+					"request_language": req.language,
+					"request_allow_external": req.allow_external,
+				},
+				exc_info=True,
+			)
+			raise HTTPException(
+				status_code=504,
+				detail=f"qa_timeout: {str(exc)}"
+			) from exc
 		except Exception as exc:
 			logger.error(
 				"qa_error",

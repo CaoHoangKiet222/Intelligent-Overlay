@@ -34,14 +34,16 @@ async def call_llm_generate(
 		body["context_len"] = context_len
 	try:
 		timeout_config = get_base_config().timeout_config
-		timeout = timeout_config.http_model_adapter.to_httpx_simple_timeout()
+		timeout = timeout_config.http_model_adapter.to_httpx_timeout()
 		async with httpx.AsyncClient(timeout=timeout) as client:
 			r = await client.post(f"{MODEL_ADAPTER}/model/generate", json=body)
 			if r.status_code >= 500:
 				raise TransientHTTPError(f"Upstream 5xx: {r.text}")
 			r.raise_for_status()
 			return r.json()
-	except httpx.TimeoutException as e:
-		raise TransientHTTPError(f"Timeout: {e}") from e
+	except (httpx.TimeoutException, httpx.ReadTimeout, httpx.ConnectTimeout) as e:
+		raise TransientHTTPError(f"Timeout: {type(e).__name__}: {str(e)}") from e
+	except (httpx.ConnectError, httpx.NetworkError) as e:
+		raise TransientHTTPError(f"Connection error: {type(e).__name__}: {str(e)}") from e
 
 

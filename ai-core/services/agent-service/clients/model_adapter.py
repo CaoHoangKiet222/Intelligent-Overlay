@@ -18,28 +18,31 @@ async def llm_generate(
 	context: str | None = None,
 ) -> Dict[str, Any]:
 	timeout_config = get_base_config().timeout_config
-	timeout = timeout_config.services.model_adapter
-	async with httpx.AsyncClient(timeout=timeout) as client:
-		if prompt_ref:
-			payload: Dict[str, Any] = {
-				"prompt_ref": prompt_ref,
-				"variables": variables or {},
-				"language": language,
-				"task": task,
-			}
-			if model_hint:
-				payload["provider_hint"] = model_hint
-			r = await client.post(f"{BASE}/model/generate", json=payload)
-		else:
-			payload = {
-				"prompt": prompt or "",
-				"language": language,
-				"provider_hint": model_hint,
-			}
-			if context is not None:
-				payload["context"] = context
-			r = await client.post(f"{BASE}/generate", json=payload)
-		r.raise_for_status()
-		return r.json()
+	timeout = timeout_config.http_model_adapter.to_httpx_timeout()
+	try:
+		async with httpx.AsyncClient(timeout=timeout) as client:
+			if prompt_ref:
+				payload: Dict[str, Any] = {
+					"prompt_ref": prompt_ref,
+					"variables": variables or {},
+					"language": language,
+					"task": task,
+				}
+				if model_hint:
+					payload["provider_hint"] = model_hint
+				r = await client.post(f"{BASE}/model/generate", json=payload)
+			else:
+				payload = {
+					"prompt": prompt or "",
+					"language": language,
+					"provider_hint": model_hint,
+				}
+				if context is not None:
+					payload["context"] = context
+				r = await client.post(f"{BASE}/generate", json=payload)
+			r.raise_for_status()
+			return r.json()
+	except (httpx.ReadTimeout, httpx.TimeoutException, httpx.ConnectTimeout) as e:
+		raise TimeoutError(f"model_adapter_timeout: {type(e).__name__}: {str(e)}") from e
 
 

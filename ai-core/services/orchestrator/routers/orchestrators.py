@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import uuid
+import logging
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -20,6 +21,8 @@ from workers.summary_worker import summarize_context
 from workers.utils import fetch_context_chunks, normalize_chunks
 from data.repositories import AnalysisRunRepo
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
 ANALYSIS_SEGMENT_LIMIT = int(os.getenv("ANALYSIS_SEGMENT_LIMIT", "12"))
 
@@ -29,29 +32,61 @@ async def orchestrator_analyze(
 	payload: OrchestratorAnalyzeRequest,
 	request: Request,
 ) -> AnalysisBundleResponse:
-	if not payload.context_id:
-		raise HTTPException(status_code=400, detail="context_id_required")
-	segments = normalize_chunks(payload.segments)
-	if not segments:
-		try:
-			segments = await fetch_context_chunks(payload.context_id, ANALYSIS_SEGMENT_LIMIT)
-		except Exception as exc:
-			raise HTTPException(status_code=502, detail=f"context_fetch_failed:{exc}") from exc
-	if not segments:
-		raise HTTPException(status_code=404, detail="context_not_found")
-
-	prompt_ids = payload.prompt_ids or {}
-	language = payload.language or "auto"
 	request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+	try:
+		if not payload.context_id:
+			raise HTTPException(status_code=400, detail="context_id_required")
+		segments = normalize_chunks(payload.segments)
+		if not segments:
+			try:
+				segments = await fetch_context_chunks(payload.context_id, ANALYSIS_SEGMENT_LIMIT)
+			except Exception as exc:
+				logger.error(
+					"context_fetch_failed",
+					extra={"context_id": payload.context_id, "request_id": request_id},
+					exc_info=True,
+				)
+				raise HTTPException(status_code=502, detail=f"context_fetch_failed:{exc}") from exc
+		if not segments:
+			raise HTTPException(status_code=404, detail="context_not_found")
 
-	worker_calls = _build_worker_calls(
-		context_id=payload.context_id,
-		segments=segments,
-		language=language,
-		prompt_ids=prompt_ids,
-	)
+		prompt_ids = payload.prompt_ids or {}
+		language = payload.language or "auto"
 
-	return await REALTIME_ORCHESTRATOR.analyze(worker_calls, request_id=request_id)
+		worker_calls = _build_worker_calls(
+			context_id=payload.context_id,
+			segments=segments,
+			language=language,
+			prompt_ids=prompt_ids,
+		)
+
+		return await REALTIME_ORCHESTRATOR.analyze(worker_calls, request_id=request_id)
+	except HTTPException:
+		raise
+	except Exception as exc:
+		logger.error(
+			"orchestrator_analyze_error",
+			extra={
+				"context_id": payload.context_id if payload else None,
+				"request_id": request_id,
+				"error_type": type(exc).__name__,
+				"error_message": str(exc),
+			},
+			exc_info=True,
+		)
+		return AnalysisBundleResponse(
+			summary=None,
+			arguments=None,
+			implications=[],
+			sentiment=None,
+			logic_bias=None,
+			worker_statuses={
+				"summary": "error",
+				"argument": "error",
+				"implication_sentiment": "error",
+				"logic_bias": "error",
+			},
+		)
 
 
 def _build_worker_calls(

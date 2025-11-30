@@ -146,9 +146,16 @@ class OllamaProvider(BaseProvider):
 			raise ProviderCallError(f"ollama embed error: {exc}") from exc
 
 		data = response.json()
-		vectors = [entry.get("embedding", []) for entry in data.get("data", [])]
+		
+		if "embeddings" in data:
+			vectors = data.get("embeddings", [])
+		elif "data" in data:
+			vectors = [entry.get("embedding", []) for entry in data.get("data", [])]
+		else:
+			raise ProviderCallError("ollama embed error: invalid response format, missing 'embeddings' or 'data' field")
+		
 		if len(vectors) != len(texts):
-			raise ProviderCallError("ollama embed error: mismatched vector count")
+			raise ProviderCallError(f"ollama embed error: mismatched vector count (expected {len(texts)}, got {len(vectors)})")
 
 		float_vectors = [list(map(float, vec)) for vec in vectors]
 		dim = len(float_vectors[0]) if float_vectors else 0

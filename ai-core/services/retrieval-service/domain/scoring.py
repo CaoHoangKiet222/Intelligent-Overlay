@@ -11,6 +11,7 @@ SELECT s.id,
 FROM embeddings e
 JOIN segments s ON s.id = e.segment_id
 WHERE s.document_id = :document_id
+  AND e.dim = :query_dim
 ORDER BY e.vector <=> :qvec
 LIMIT :limit
 """
@@ -44,6 +45,7 @@ vec AS (
   FROM embeddings e
   JOIN segments s ON s.id = e.segment_id
   WHERE s.document_id = :document_id
+    AND e.dim = :query_dim
   ORDER BY e.vector <=> :qvec
   LIMIT :vec_k
 ),

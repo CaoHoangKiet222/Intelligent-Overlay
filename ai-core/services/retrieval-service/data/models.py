@@ -14,9 +14,6 @@ if str(ai_core_path) not in sys.path:
 
 from shared.config.service_configs import RetrievalServiceConfig
 
-_config = RetrievalServiceConfig.from_env()
-EMBEDDING_DIM = _config.embedding_dim
-
 
 class SourceType(str, enum.Enum):
 	TEXT = "text"
@@ -74,7 +71,7 @@ class Embedding(Base):
 	model = Column(String(64), nullable=False)
 	dim = Column(Integer, nullable=False)
 	created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
-	vector = Column(Vector(EMBEDDING_DIM), nullable=False)
+	vector = Column(Vector(16000), nullable=False)
 	__table_args__ = (CheckConstraint("dim > 0", name="ck_embeddings_dim_positive"),)
 
 

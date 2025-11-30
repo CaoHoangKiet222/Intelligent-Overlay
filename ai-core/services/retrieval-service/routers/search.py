@@ -19,6 +19,7 @@ from data.repositories import get_document_by_id, list_segments_by_document, get
 from clients.model_adapter import embed_texts
 from metrics.prometheus import observe_latency, vec_candidates, trgm_candidates
 from domain.context_pipeline import segment_to_chunk
+from domain.vector_utils import expand_vector_to_max_dim, MAX_VECTOR_DIM
 from app.config import EMBEDDING_DIM
 
 
@@ -33,12 +34,12 @@ LIMIT :limit
 """
 
 
-def _create_vector_sql_stmt(dim: int):
-	return sql(VECTOR_SQL).bindparams(bindparam("qvec", type_=Vector(dim)))
+def _create_vector_sql_stmt():
+	return sql(VECTOR_SQL).bindparams(bindparam("qvec", type_=Vector(MAX_VECTOR_DIM)))
 
 
-def _create_hybrid_sql_stmt(dim: int):
-	return sql(HYBRID_SQL).bindparams(bindparam("qvec", type_=Vector(dim)))
+def _create_hybrid_sql_stmt():
+	return sql(HYBRID_SQL).bindparams(bindparam("qvec", type_=Vector(MAX_VECTOR_DIM)))
 
 
 @router.get("/context/{context_id}", response_model=ContextDetailResponse, summary="Fetch context chunks by id")
@@ -91,6 +92,7 @@ async def search(payload: RetrievalSearchRequest):
 				query_dim = db_dim
 			if query_dim is None:
 				query_dim = EMBEDDING_DIM
+			query_vector = expand_vector_to_max_dim(query_vector, query_dim)
 
 		if payload.mode == RetrievalMode.LEXICAL:
 			rows = await _run_lexical(session, context_uuid, payload.query, payload.top_k)
@@ -119,11 +121,11 @@ async def search(payload: RetrievalSearchRequest):
 
 
 async def _run_vector(session, context_id: uuid.UUID, query_vector: Sequence[float], dim: int, limit: int):
-	stmt = _create_vector_sql_stmt(dim)
+	stmt = _create_vector_sql_stmt()
 	raw_rows = (
 		await session.execute(
 			stmt,
-			{"document_id": context_id, "qvec": list(query_vector), "limit": max(limit * 4, limit)},
+			{"document_id": context_id, "qvec": list(query_vector), "query_dim": dim, "limit": max(limit * 4, limit)},
 		)
 	).mappings().all()
 	rows = []
@@ -156,17 +158,17 @@ async def _run_lexical(session, context_id: uuid.UUID, query: str, limit: int):
 
 
 async def _run_hybrid(session, context_id: uuid.UUID, payload: RetrievalSearchRequest, query_vector: Sequence[float], dim: int):
-	stmt = _create_hybrid_sql_stmt(dim)
+	stmt = _create_hybrid_sql_stmt()
 	params = {
 		"document_id": context_id,
 		"query": payload.query,
-		"qvec": query_vector,
+		"qvec": list(query_vector),
+		"query_dim": dim,
 		"alpha": payload.alpha,
 		"vec_k": max(payload.top_k * 4, payload.top_k),
 		"trgm_k": max(payload.top_k * 4, payload.top_k),
 		"top_k": payload.top_k,
 	}
-	params["qvec"] = list(query_vector)
 	raw_rows = (await session.execute(stmt, params)).mappings().all()
 	rows = []
 	for row in raw_rows:

@@ -171,7 +171,13 @@ async def demo_analyze_direct(payload: DemoAnalyzeRequest) -> dict[str, object]:
 		}
 		orchestrator_url = f"{cfg.orchestrator_base_url.rstrip('/')}/orchestrator/analyze"
 		logger.debug("Calling orchestrator", extra={"url": orchestrator_url, "context_id": context_id})
-		timeout = timeout_config.services.orchestrator
+		orchestrator_timeout_seconds = float(os.getenv("ORCHESTRATOR_TIMEOUT_SECONDS", "3600"))
+		timeout = httpx.Timeout(
+			connect=60.0,
+			read=orchestrator_timeout_seconds,
+			write=60.0,
+			pool=60.0,
+		)
 		async with httpx.AsyncClient(timeout=timeout) as client:
 			resp = await client.post(orchestrator_url, json=orchestrator_payload)
 		resp.raise_for_status()
@@ -194,6 +200,23 @@ async def demo_analyze_direct(payload: DemoAnalyzeRequest) -> dict[str, object]:
 			exc_info=True,
 		)
 		raise HTTPException(status_code=exc.response.status_code, detail=response_text)
+	except (httpx.ReadTimeout, httpx.TimeoutException, httpx.ConnectTimeout) as exc:
+		logger.error(
+			"Orchestrator timeout during direct analyze",
+			extra={
+				"error_type": type(exc).__name__,
+				"error_message": str(exc),
+				"request_url": orchestrator_url,
+				"orchestrator_base_url": cfg.orchestrator_base_url,
+				"context_id": context_id,
+				"timeout_seconds": orchestrator_timeout_seconds,
+			},
+			exc_info=True,
+		)
+		raise HTTPException(
+			status_code=504,
+			detail=f"Orchestrator timeout after {orchestrator_timeout_seconds}s: {type(exc).__name__}"
+		) from exc
 	except httpx.RequestError as exc:
 		logger.error(
 			"Request error during direct analyze",
