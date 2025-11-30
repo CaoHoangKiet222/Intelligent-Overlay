@@ -6,16 +6,21 @@ from typing import List
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
+import io
+import time
+
 from domain.errors import ProviderCallError
-from domain.models import EmbeddingResult, GenerationResult
+from domain.models import EmbeddingResult, GenerationResult, TranscriptionResult, TranscriptSegment, OCRResult
 from providers.base import BaseProvider
 from providers.mock_embeddings import build_mock_embeddings, DEFAULT_MOCK_EMBED_DIM
 from providers.mock_generation import generate_mock_output
 
 CHAT_COMPLETIONS_ENDPOINT = "/chat/completions"
 EMBEDDINGS_ENDPOINT = "/embeddings"
+TRANSCRIPTIONS_ENDPOINT = "/audio/transcriptions"
 DEFAULT_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_EMBED_MODEL = "text-embedding-3-small"
+DEFAULT_VISION_MODEL = "gpt-4o"
 
 
 class OpenAIProvider(BaseProvider):
@@ -125,6 +130,137 @@ class OpenAIProvider(BaseProvider):
 
 	def count_tokens(self, text: str) -> int:
 		return max(1, len(text) // 4)
+
+	def transcribe(self, audio_bytes: bytes, lang_hint: str | None = None) -> TranscriptionResult:
+		start = time.perf_counter()
+		if self._mock_mode:
+			return TranscriptionResult(
+				segments=[
+					TranscriptSegment(
+						text="[STT_MOCK: OpenAI API key not configured]",
+						start_ms=0,
+						end_ms=1000,
+						speaker_label=None
+					)
+				],
+				model="whisper-1",
+				latency_ms=int((time.perf_counter() - start) * 1000),
+			)
+
+		client = self._ensure_client()
+		files = {
+			"file": ("audio", io.BytesIO(audio_bytes), "audio/mpeg")
+		}
+		data: dict[str, str] = {
+			"model": "whisper-1",
+			"response_format": "verbose_json",
+		}
+		if lang_hint:
+			lang_code = lang_hint.split("-")[0] if "-" in lang_hint else lang_hint
+			data["language"] = lang_code
+
+		try:
+			response = client.post(TRANSCRIPTIONS_ENDPOINT, files=files, data=data)
+			response.raise_for_status()
+			result = response.json()
+
+			text = result.get("text", "")
+			segments_raw = result.get("segments", [])
+
+			if segments_raw:
+				transcript_segments = []
+				for seg in segments_raw:
+					transcript_segments.append(
+						TranscriptSegment(
+							text=seg.get("text", "").strip(),
+							start_ms=int(seg.get("start", 0) * 1000),
+							end_ms=int(seg.get("end", 0) * 1000),
+							speaker_label=None
+						)
+					)
+				segments = transcript_segments
+			else:
+				segments = [
+					TranscriptSegment(
+						text=text,
+						start_ms=0,
+						end_ms=0,
+						speaker_label=None
+					)
+				]
+
+			latency_ms = int((time.perf_counter() - start) * 1000)
+			return TranscriptionResult(
+				segments=segments,
+				model="whisper-1",
+				latency_ms=latency_ms,
+			)
+		except httpx.HTTPError as exc:
+			raise ProviderCallError(f"openai transcribe error: {exc}") from exc
+
+	def extract_text_from_image(self, image_data_base64: str, lang_hint: str | None = None) -> OCRResult:
+		start = time.perf_counter()
+		if self._mock_mode:
+			return OCRResult(
+				text="[OCR_MOCK: OpenAI API key not configured]",
+				model=DEFAULT_VISION_MODEL,
+				latency_ms=int((time.perf_counter() - start) * 1000),
+			)
+
+		client = self._ensure_client()
+		image_url = f"data:image/jpeg;base64,{image_data_base64}"
+
+		prompt = "Extract all text from this image. Preserve the structure and formatting as much as possible. If the image contains multiple languages, extract text in all languages."
+		if lang_hint:
+			lang_name = {"vi": "Vietnamese", "en": "English", "zh": "Chinese", "ja": "Japanese", "ko": "Korean"}.get(lang_hint.lower(), "")
+			if lang_name:
+				prompt += f" Pay special attention to {lang_name} text."
+
+		payload = {
+			"model": DEFAULT_VISION_MODEL,
+			"messages": [
+				{
+					"role": "user",
+					"content": [
+						{
+							"type": "text",
+							"text": prompt
+						},
+						{
+							"type": "image_url",
+							"image_url": {
+								"url": image_url
+							}
+						}
+					]
+				}
+			],
+			"max_tokens": 4096,
+			"temperature": 0.1,
+		}
+
+		try:
+			response = self._post_with_retry(client, CHAT_COMPLETIONS_ENDPOINT, payload)
+			data = response.json()
+
+			choices = data.get("choices", [])
+			if not choices:
+				raise ProviderCallError("openai ocr error: empty choices")
+
+			message = choices[0].get("message", {})
+			content = message.get("content", "")
+
+			if not content:
+				raise ProviderCallError("openai ocr error: no text extracted")
+
+			latency_ms = int((time.perf_counter() - start) * 1000)
+			return OCRResult(
+				text=content.strip(),
+				model=DEFAULT_VISION_MODEL,
+				latency_ms=latency_ms,
+			)
+		except httpx.HTTPError as exc:
+			raise ProviderCallError(f"openai ocr error: {exc}") from exc
 
 	def _mock_generation(self, prompt: str, start: float) -> GenerationResult:
 		text = generate_mock_output(self.name, prompt)

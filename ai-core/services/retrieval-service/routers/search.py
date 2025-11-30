@@ -18,7 +18,7 @@ from data.db import SessionLocal
 from data.repositories import get_document_by_id, list_segments_by_document, get_embedding_dimension
 from clients.model_adapter import embed_texts
 from metrics.prometheus import observe_latency, vec_candidates, trgm_candidates
-from domain.context_pipeline import segment_to_chunk
+from domain.utils import segment_to_chunk
 from domain.vector_utils import expand_vector_to_max_dim, MAX_VECTOR_DIM
 from app.config import EMBEDDING_DIM
 

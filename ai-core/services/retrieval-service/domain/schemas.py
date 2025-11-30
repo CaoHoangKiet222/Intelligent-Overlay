@@ -4,20 +4,6 @@ from pydantic import BaseModel, Field
 from shared.contracts import ContextChunk, SpanRef
 
 
-class NormalizeAndIndexRequest(BaseModel):
-	raw_text: str = Field(min_length=1)
-	url: Optional[str] = None
-	locale: Optional[str] = "auto"
-
-
-class NormalizeAndIndexResponse(BaseModel):
-	context_id: str
-	locale: Optional[str] = None
-	chunk_count: int
-	deduplicated: bool = False
-	segments: List[ContextChunk] = Field(default_factory=list)
-
-
 class RetrievalMode(str, Enum):
 	VECTOR = "vector"
 	LEXICAL = "lexical"
@@ -53,5 +39,3 @@ class ContextDetailResponse(BaseModel):
 	locale: Optional[str] = None
 	chunk_count: int
 	segments: List[ContextChunk] = Field(default_factory=list)
-
-

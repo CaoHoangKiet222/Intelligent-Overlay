@@ -19,6 +19,7 @@ class RetrievalServiceConfig:
 	@staticmethod
 	def from_env() -> "RetrievalServiceConfig":
 		base = get_base_config()
+		
 		return RetrievalServiceConfig(
 			database_url=base.database_url,
 			model_adapter_base_url=base.model_adapter_base_url,
@@ -186,5 +187,24 @@ class PromptServiceConfig:
 		base = get_base_config()
 		return PromptServiceConfig(
 			database_dsn=base.database_dsn,
+		)
+
+
+@dataclass(frozen=True)
+class ContextIngestionServiceConfig:
+	database_url: str
+	model_adapter_base_url: str
+	embed_model_hint: str
+	embedding_dim: int
+	
+	@staticmethod
+	def from_env() -> "ContextIngestionServiceConfig":
+		base = get_base_config()
+		
+		return ContextIngestionServiceConfig(
+			database_url=base.database_url,
+			model_adapter_base_url=base.model_adapter_base_url,
+			embed_model_hint=os.getenv("EMBED_MODEL_HINT", "ollama"),
+			embedding_dim=int(os.getenv("EMBEDDING_DIM", "1024")),
 		)
 

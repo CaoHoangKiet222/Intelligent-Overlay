@@ -1,6 +1,5 @@
-from sqlalchemy import CheckConstraint, Column, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Column, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
-from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
 import uuid
 import sys
@@ -12,7 +11,10 @@ ai_core_path = Path(__file__).parent.parent.parent.parent
 if str(ai_core_path) not in sys.path:
 	sys.path.insert(0, str(ai_core_path))
 
-from shared.config.service_configs import RetrievalServiceConfig
+from shared.config.service_configs import ContextIngestionServiceConfig
+
+_config = ContextIngestionServiceConfig.from_env()
+EMBEDDING_DIM = _config.embedding_dim
 
 
 class SourceType(str, enum.Enum):
@@ -46,7 +48,7 @@ class Document(Base):
 	title = Column(Text)
 	locale = Column(String(10))
 	content_hash = Column(String(64))
-	meta = Column("metadata", JSONB)  # Use 'meta' as Python attribute, 'metadata' as DB column name
+	meta = Column("metadata", JSONB)
 	created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
 	updated_at = Column(
 		TIMESTAMP(timezone=True),
@@ -79,7 +81,5 @@ class Embedding(Base):
 	model = Column(String(64), nullable=False)
 	dim = Column(Integer, nullable=False)
 	created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
-	vector = Column(Vector(16000), nullable=False)
-	__table_args__ = (CheckConstraint("dim > 0", name="ck_embeddings_dim_positive"),)
-
+	vector = Column(Vector(EMBEDDING_DIM), nullable=False)
 

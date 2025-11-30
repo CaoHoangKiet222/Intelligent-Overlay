@@ -3,8 +3,10 @@ import re
 from typing import Iterable, List, Sequence, Tuple
 from shared.contracts import ContextBundle, ContextChunk
 from clients.model_adapter import embed_texts
+from services.vision_ocr import extract_text_from_image
+from services.stt import transcribe_audio
 from data.db import SessionLocal
-from data.models import Segment
+from data.models import Segment, SourceType
 from data.repositories import (
 	create_document,
 	bulk_insert_embeddings,
@@ -14,6 +16,7 @@ from data.repositories import (
 )
 from app.config import EMBEDDING_DIM
 from domain.segmentation import segment_text
+from domain.schemas import ActivationPayload, ActivationSourceType
 from domain.vector_utils import expand_vector_to_max_dim
 
 
@@ -42,13 +45,22 @@ def segment_to_chunk(segment: Segment) -> ContextChunk:
 	)
 
 
-class NormalizeAndIndexService:
-	def __init__(self, max_chars: int = 900, overlap: int = 120, embed_batch: int = 32):
+class IngestionService:
+	def __init__(
+		self,
+		max_chars: int = 900,
+		overlap: int = 120,
+		embed_batch: int = 32
+	):
 		self._max_chars = max_chars
 		self._overlap = overlap
 		self._embed_batch = max(1, embed_batch)
 
-	async def run(self, raw_text: str, url: str | None, locale: str | None) -> ContextBundle:
+	async def run(self, payload: ActivationPayload) -> ContextBundle:
+		raw_text = await self._extract_text_from_payload(payload)
+		url = payload.url
+		locale = payload.locale or "auto"
+		source_type = self._map_source_type(payload.source_type)
 		normalized = normalize_text(raw_text)
 		if not normalized:
 			raise ValueError("normalized_text_empty")
@@ -63,11 +75,16 @@ class NormalizeAndIndexService:
 					raw_text=normalized,
 					locale=existing.locale or locale or "auto",
 					source_url=url,
+					source_type=source_type.value,
 					segments=[segment_to_chunk(seg) for seg in segments],
-					metadata={"deduplicated": True},
+					metadata={"deduplicated": True, "app_id": payload.app_id},
 				)
 
-		segments_data = segment_text(normalized, max_chars=self._max_chars, overlap=self._overlap)
+		if payload.transcript_segments:
+			segments_data = self._segment_from_transcript(payload.transcript_segments, normalized)
+		else:
+			segments_data = segment_text(normalized, max_chars=self._max_chars, overlap=self._overlap)
+
 		if not segments_data:
 			raise ValueError("no_segments_generated")
 
@@ -75,15 +92,22 @@ class NormalizeAndIndexService:
 
 		async with SessionLocal() as session:
 			async with session.begin():
+				meta = {
+					"chunk_count": len(segments_data),
+					"app_id": payload.app_id,
+				}
+				if payload.image_metadata:
+					meta["image_metadata"] = payload.image_metadata.model_dump()
+				
 				doc = await create_document(
 					session,
 					{
-						"source_type": "text",
+						"source_type": source_type.value,
 						"source_url": url,
 						"title": None,
 						"locale": locale or "auto",
 						"content_hash": content_hash,
-						"meta": {"chunk_count": len(segments_data)},
+						"meta": meta,
 					},
 				)
 				segments_payload = [
@@ -92,6 +116,9 @@ class NormalizeAndIndexService:
 						"start_offset": item.get("start_offset"),
 						"end_offset": item.get("end_offset"),
 						"sentence_no": idx,
+						"timestamp_start_ms": item.get("timestamp_start_ms"),
+						"timestamp_end_ms": item.get("timestamp_end_ms"),
+						"speaker_label": item.get("speaker_label"),
 					}
 					for idx, item in enumerate(segments_data)
 				]
@@ -107,8 +134,73 @@ class NormalizeAndIndexService:
 				raw_text=normalized,
 				locale=locale or "auto",
 				source_url=url,
+				source_type=source_type.value,
 				segments=[segment_to_chunk(seg) for seg in segment_records],
+				metadata={"app_id": payload.app_id},
 			)
+
+	async def _extract_text_from_payload(self, payload: ActivationPayload) -> str:
+		if payload.raw_text:
+			return payload.raw_text
+
+		if payload.source_type == ActivationSourceType.IMAGE:
+			if not payload.image_data:
+				raise ValueError("image source requires image_data when raw_text is not provided")
+			ocr_text = await extract_text_from_image(
+				payload.image_data,
+				lang_hint=payload.locale
+			)
+			return ocr_text
+
+		if payload.source_type == ActivationSourceType.VIDEO:
+			if payload.transcript_segments:
+				return "\n".join(seg.text for seg in payload.transcript_segments)
+			if not payload.audio_data:
+				raise ValueError("video source requires audio_data or transcript_segments when raw_text is not provided")
+			segments = await transcribe_audio(
+				payload.audio_data,
+				lang_hint=payload.locale
+			)
+			return "\n".join(seg.text for seg in segments)
+
+		raise ValueError(f"{payload.source_type} source requires raw_text")
+
+	def _map_source_type(self, source_type: ActivationSourceType) -> SourceType:
+		mapping = {
+			ActivationSourceType.BROWSER: SourceType.BROWSER,
+			ActivationSourceType.SHARE: SourceType.SHARE,
+			ActivationSourceType.SELECTION: SourceType.SELECTION,
+			ActivationSourceType.BUBBLE: SourceType.BUBBLE,
+			ActivationSourceType.BACKTAP: SourceType.BACKTAP,
+			ActivationSourceType.NOTI: SourceType.NOTI,
+			ActivationSourceType.IMAGE: SourceType.IMAGE,
+			ActivationSourceType.VIDEO: SourceType.VIDEO,
+		}
+		return mapping.get(source_type, SourceType.TEXT)
+
+	def _segment_from_transcript(
+		self,
+		transcript_segments: List,
+		normalized_text: str
+	) -> List[dict]:
+		segments = []
+		current_offset = 0
+		for seg in transcript_segments:
+			text = seg.text if hasattr(seg, "text") else seg.get("text", "")
+			if not text:
+				continue
+			start_offset = current_offset
+			end_offset = current_offset + len(text)
+			segments.append({
+				"text": text,
+				"start_offset": start_offset,
+				"end_offset": end_offset,
+				"timestamp_start_ms": seg.start_ms if hasattr(seg, "start_ms") else seg.get("start_ms"),
+				"timestamp_end_ms": seg.end_ms if hasattr(seg, "end_ms") else seg.get("end_ms"),
+				"speaker_label": seg.speaker_label if hasattr(seg, "speaker_label") else seg.get("speaker_label"),
+			})
+			current_offset = end_offset + 1
+		return segments
 
 	async def _embed_chunks(self, texts: Sequence[str]) -> Tuple[List[List[float]], str, int]:
 		vectors: List[List[float]] = []

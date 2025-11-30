@@ -11,6 +11,7 @@ get_service_port() {
 		"retrieval-service") echo "8083" ;;
 		"agent-service") echo "8084" ;;
 		"orchestrator") echo "8085" ;;
+		"context-ingestion-service") echo "8086" ;;
 		"demo-api") echo "8090" ;;
 		*) echo "" ;;
 	esac
@@ -23,6 +24,7 @@ get_service_path() {
 		"retrieval-service") echo "ai-core/services/retrieval-service" ;;
 		"agent-service") echo "ai-core/services/agent-service" ;;
 		"orchestrator") echo "ai-core/services/orchestrator" ;;
+		"context-ingestion-service") echo "ai-core/services/context-ingestion-service" ;;
 		"demo-api") echo "ai-core/services/demo-api" ;;
 		*) echo "" ;;
 	esac
@@ -36,7 +38,7 @@ run_service() {
 	local service_path=$(get_service_path "$service_name")
 	if [ -z "$service_path" ]; then
 		echo "✗ Unknown service: $service_name"
-		echo "Available services: model-adapter, prompt-service, retrieval-service, agent-service, orchestrator, demo-api"
+		echo "Available services: model-adapter, prompt-service, retrieval-service, agent-service, orchestrator, context-ingestion-service, demo-api"
 		return 1
 	fi
 	
@@ -82,6 +84,7 @@ run_service() {
 			sed -i '' 's|http://model-adapter:8000|http://localhost:8081|g' .env
 			sed -i '' 's|http://prompt-service:8000|http://localhost:8082|g' .env
 			sed -i '' 's|http://retrieval-service:8000|http://localhost:8083|g' .env
+			sed -i '' 's|http://context-ingestion-service:8000|http://localhost:8086|g' .env
 			sed -i '' 's|ray-head:6379|localhost:6379|g' .env
 			# Set RAY_ADDRESS to empty for local development (starts new local instance)
 			sed -i '' 's/^RAY_ADDRESS=auto/RAY_ADDRESS=/' .env
@@ -92,6 +95,7 @@ run_service() {
 			sed -i 's|http://model-adapter:8000|http://localhost:8081|g' .env
 			sed -i 's|http://prompt-service:8000|http://localhost:8082|g' .env
 			sed -i 's|http://retrieval-service:8000|http://localhost:8083|g' .env
+			sed -i 's|http://context-ingestion-service:8000|http://localhost:8086|g' .env
 			sed -i 's|ray-head:6379|localhost:6379|g' .env
 			# Set RAY_ADDRESS to empty for local development (starts new local instance)
 			sed -i 's/^RAY_ADDRESS=auto/RAY_ADDRESS=/' .env
@@ -178,6 +182,7 @@ show_usage() {
 	echo "  retrieval-service (port 8083)"
 	echo "  agent-service (port 8084)"
 	echo "  orchestrator (port 8085)"
+	echo "  context-ingestion-service (port 8086)"
 	echo "  demo-api (port 8090)"
 	echo ""
 	echo "Environment:"

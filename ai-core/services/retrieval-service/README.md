@@ -1,10 +1,9 @@
 # Retrieval Service
 
-Hybrid search (pgvector cosine + pg_trgm similarity), ingestion PDF/Text/Transcript, citation spans.
+Hybrid search (pgvector cosine + pg_trgm similarity) với citation spans.
 
 ## Mục đích
 
-- Cung cấp dịch vụ ingest tài liệu, segment + embed để phục vụ RAG.
 - Tìm kiếm hybrid (vector + trigram) tối ưu latency và chất lượng, trả spans/offset cho citation.
 - Bộc lộ metrics latency/candidates để theo dõi hiệu năng và tuning.
 
@@ -26,9 +25,19 @@ Hybrid search (pgvector cosine + pg_trgm similarity), ingestion PDF/Text/Transcr
 
 ## Endpoints
 
-- `POST /ingest` (form/json): source_type=text|pdf|transcript
-- `POST /search` body: `{context_id?, query, alpha?, top_k?, vec_k?, trgm_k?, filter_document_ids?}`
-- Embedding mọi truy vấn thông qua `model-adapter` (`POST /model/embed`) → đảm bảo guardrails + routing thống nhất.
+- `POST /retrieval/search`: Hybrid search trong context chunks
+  - Body: `{context_id, query, top_k?, mode?, alpha?}`
+  - Modes: `vector`, `lexical`, `hybrid` (default)
+  - Trả về spans với scores và breakdown
+- `GET /retrieval/context/{context_id}`: Lấy context chunks theo ID
+  - Query params: `limit?` (default: 12, max: 100)
+
+Embedding mọi truy vấn thông qua `model-adapter` (`POST /model/embed`) → đảm bảo guardrails + routing thống nhất.
+
+## Lưu ý
+
+- Ingestion logic (normalize, chunking, OCR, STT) đã được di chuyển sang `context-ingestion-service`
+- Service này chỉ tập trung vào search/retrieval
 
 ## DB Indexes
 

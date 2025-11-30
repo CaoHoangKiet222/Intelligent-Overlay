@@ -18,3 +18,25 @@ class EmbeddingResult:
 	dim: int | None = None
 
 
+@dataclass(frozen=True)
+class TranscriptSegment:
+	text: str
+	start_ms: int
+	end_ms: int
+	speaker_label: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class TranscriptionResult:
+	segments: List[TranscriptSegment]
+	model: str
+	latency_ms: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class OCRResult:
+	text: str
+	model: str
+	latency_ms: Optional[int] = None
+
+

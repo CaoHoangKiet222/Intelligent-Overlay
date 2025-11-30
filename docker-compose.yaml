@@ -317,6 +317,30 @@ services:
       timeout: 5s
       retries: 5
 
+  context-ingestion-service:
+    build:
+      context: ./ai-core
+    container_name: ai_core_context_ingestion_service
+    environment:
+      PORT: 8000
+      DB_DSN: ${DB_DSN:-postgresql+psycopg://ai:ai@postgres:5432/ai_core}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ai:ai@postgres:5432/ai_core}
+      MODEL_ADAPTER_BASE_URL: ${MODEL_ADAPTER_BASE_URL:-http://model-adapter:8000}
+      EMBED_MODEL_HINT: ${EMBED_MODEL_HINT:-qwen3-embedding:0.6b}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8086:8000"
+    networks:
+      - ai_core_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   demo-api:
     build:
       context: ./ai-core

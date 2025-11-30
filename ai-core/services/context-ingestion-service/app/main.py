@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from routers.search import router as search_router
+from routers.contexts import router as contexts_router
 from metrics.prometheus import metrics_app
 from data.db import ensure_extensions
 
@@ -11,8 +11,8 @@ async def lifespan(_app: FastAPI):
 	yield
 
 
-app = FastAPI(title="Retrieval Service", version="0.1.0", lifespan=lifespan)
-app.include_router(search_router)
+app = FastAPI(title="Context Ingestion Service", version="0.1.0", lifespan=lifespan)
+app.include_router(contexts_router)
 app.mount("/metrics", metrics_app)
 
 @app.get("/healthz")
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 		format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 	)
 	logger = logging.getLogger(__name__)
-	logger.info(f"Starting Retrieval Service on port {port}")
+	logger.info(f"Starting Context Ingestion Service on port {port}")
 	logger.info(f"Debug mode: {debug_mode}")
 	logger.info(f"Health check: http://localhost:{port}/healthz")
 	logger.info(f"Metrics: http://localhost:{port}/metrics")
