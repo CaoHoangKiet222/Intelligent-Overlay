@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from dataclasses import dataclass
-from typing import Any, Awaitable, Dict, List, Sequence, Tuple
+from typing import Any, Awaitable, Dict, Sequence, Tuple
 
 from domain.schemas import (
 	AnalysisBundleResponse,
@@ -13,8 +12,13 @@ from domain.schemas import (
 	LogicBiasOutput,
 	SummaryWorkerOutput,
 )
+from shared.config.base import get_base_config
 
 WorkerResultPayload = Tuple[Any, Dict[str, object]]
+
+
+def _get_default_realtime_timeout() -> float:
+	return get_base_config().timeout_config.workers.realtime_worker
 
 
 @dataclass
@@ -24,8 +28,8 @@ class WorkerCall:
 
 
 class RealtimeOrchestrator:
-	def __init__(self, *, worker_timeout: float = 15.0):
-		self.worker_timeout = worker_timeout
+	def __init__(self, *, worker_timeout: float | None = None):
+		self.worker_timeout = worker_timeout if worker_timeout is not None else _get_default_realtime_timeout()
 		self.logger = logging.getLogger(__name__)
 
 	async def analyze(
@@ -130,10 +134,5 @@ class RealtimeOrchestrator:
 		return None
 
 
-from shared.config.base import get_base_config
-
-def _get_realtime_timeout() -> float:
-	return get_base_config().timeout_config.workers.realtime_worker
-
-REALTIME_ORCHESTRATOR = RealtimeOrchestrator(worker_timeout=_get_realtime_timeout())
+REALTIME_ORCHESTRATOR = RealtimeOrchestrator()
 
