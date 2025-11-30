@@ -17,7 +17,7 @@ from data.repositories import (
 from app.config import EMBEDDING_DIM
 from domain.segmentation import segment_text
 from domain.schemas import ActivationPayload, ActivationSourceType
-from domain.vector_utils import expand_vector_to_max_dim
+from domain.vector import expand_vector_to_max_dim
 
 
 def normalize_text(raw: str) -> str:
