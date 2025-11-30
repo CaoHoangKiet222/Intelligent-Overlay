@@ -46,3 +46,12 @@ async def get_document_by_id(s: AsyncSession, document_id) -> Optional[Document]
 	return res.scalars().first()
 
 
+async def get_embedding_dimension(s: AsyncSession, document_id) -> Optional[int]:
+	stmt = select(Embedding.dim).where(Embedding.segment_id.in_(
+		select(Segment.id).where(Segment.document_id == document_id)
+	)).limit(1)
+	res = await s.execute(stmt)
+	dim = res.scalar_one_or_none()
+	return dim
+
+

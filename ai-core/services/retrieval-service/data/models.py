@@ -3,11 +3,19 @@ from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
 import uuid
-import os
+import sys
+from pathlib import Path
 from .db import Base
 import enum
 
-EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", "1536"))
+ai_core_path = Path(__file__).parent.parent.parent.parent
+if str(ai_core_path) not in sys.path:
+	sys.path.insert(0, str(ai_core_path))
+
+from shared.config.service_configs import RetrievalServiceConfig
+
+_config = RetrievalServiceConfig.from_env()
+EMBEDDING_DIM = _config.embedding_dim
 
 
 class SourceType(str, enum.Enum):

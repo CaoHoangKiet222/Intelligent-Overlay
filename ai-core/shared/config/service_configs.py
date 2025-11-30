@@ -56,7 +56,7 @@ class OrchestratorServiceConfig:
 			database_url=base.database_url,
 			model_adapter_base_url=base.model_adapter_base_url,
 			prompt_service_base_url=base.prompt_service_base_url,
-			ray_address=base.ray_address if base.ray_address else f"{os.getenv('RAY_HOST', 'ray-head')}:{os.getenv('RAY_PORT', '6380')}",
+			ray_address=base.ray_address,
 			ray_num_cpus=base.ray_num_cpus,
 			ray_num_gpus=base.ray_num_gpus,
 			redis_url=base.redis_url,

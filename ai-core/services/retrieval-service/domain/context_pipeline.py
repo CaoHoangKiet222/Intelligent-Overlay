@@ -112,18 +112,25 @@ class NormalizeAndIndexService:
 	async def _embed_chunks(self, texts: Sequence[str]) -> Tuple[List[List[float]], str, int]:
 		vectors: List[List[float]] = []
 		model_name: str | None = None
-		dimension: int | None = EMBEDDING_DIM
+		dimension: int | None = None
 		for batch in _batched(texts, self._embed_batch):
 			if not batch:
 				continue
 			resp = await embed_texts(list(batch))
 			batch_vectors_raw = resp.get("vectors") or []
-			batch_vectors = [self._coerce_vector(vec) for vec in batch_vectors_raw]
+			response_dim = resp.get("dim")
+			if response_dim is not None:
+				dimension = response_dim
+			if dimension is None:
+				if batch_vectors_raw:
+					dimension = len(batch_vectors_raw[0])
+			if dimension is None:
+				dimension = EMBEDDING_DIM
+			batch_vectors = [self._coerce_vector(vec, dimension) for vec in batch_vectors_raw]
 			if not batch_vectors:
 				raise ValueError("embedding_vectors_missing")
 			vectors.extend(batch_vectors)
 			model_name = resp.get("model", model_name)
-			dimension = EMBEDDING_DIM
 		if len(vectors) != len(texts):
 			raise ValueError("embedding_count_mismatch")
 		if model_name is None or dimension is None:
@@ -131,13 +138,13 @@ class NormalizeAndIndexService:
 		return vectors, model_name, dimension
 
 	@staticmethod
-	def _coerce_vector(vector: Sequence[float]) -> List[float]:
+	def _coerce_vector(vector: Sequence[float], target_dim: int) -> List[float]:
 		float_vec = [float(v) for v in vector]
-		if len(float_vec) == EMBEDDING_DIM:
+		if len(float_vec) == target_dim:
 			return float_vec
-		if len(float_vec) > EMBEDDING_DIM:
-			return float_vec[:EMBEDDING_DIM]
-		padding = [0.0] * (EMBEDDING_DIM - len(float_vec))
+		if len(float_vec) > target_dim:
+			return float_vec[:target_dim]
+		padding = [0.0] * (target_dim - len(float_vec))
 		return float_vec + padding
 
 

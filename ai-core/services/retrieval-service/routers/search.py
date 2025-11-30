@@ -15,7 +15,7 @@ from shared.contracts import SpanRef
 from domain.scoring import HYBRID_SQL, LEXICAL_SQL, VECTOR_SQL
 from domain.highlight import find_local_span
 from data.db import SessionLocal
-from data.repositories import get_document_by_id, list_segments_by_document
+from data.repositories import get_document_by_id, list_segments_by_document, get_embedding_dimension
 from clients.model_adapter import embed_texts
 from metrics.prometheus import observe_latency, vec_candidates, trgm_candidates
 from domain.context_pipeline import segment_to_chunk
@@ -31,8 +31,14 @@ WHERE s.document_id = :document_id
 ORDER BY s.start_offset
 LIMIT :limit
 """
-_VECTOR_SQL_STMT = sql(VECTOR_SQL).bindparams(bindparam("qvec", type_=Vector(EMBEDDING_DIM)))
-_HYBRID_SQL_STMT = sql(HYBRID_SQL).bindparams(bindparam("qvec", type_=Vector(EMBEDDING_DIM)))
+
+
+def _create_vector_sql_stmt(dim: int):
+	return sql(VECTOR_SQL).bindparams(bindparam("qvec", type_=Vector(dim)))
+
+
+def _create_hybrid_sql_stmt(dim: int):
+	return sql(HYBRID_SQL).bindparams(bindparam("qvec", type_=Vector(dim)))
 
 
 @router.get("/context/{context_id}", response_model=ContextDetailResponse, summary="Fetch context chunks by id")
@@ -66,23 +72,34 @@ async def search(payload: RetrievalSearchRequest):
 
 	t0 = perf_counter()
 	query_vector = None
+	query_dim = None
 	if payload.mode in (RetrievalMode.VECTOR, RetrievalMode.HYBRID):
 		em = await embed_texts([payload.query])
 		query_vector = em["vectors"][0]
+		query_dim = em.get("dim")
+		if query_dim is None and query_vector:
+			query_dim = len(query_vector)
 
 	async with SessionLocal() as session:
 		document = await get_document_by_id(session, context_uuid)
 		if not document:
 			raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="context_not_found")
 
+		if payload.mode in (RetrievalMode.VECTOR, RetrievalMode.HYBRID):
+			db_dim = await get_embedding_dimension(session, context_uuid)
+			if db_dim is not None:
+				query_dim = db_dim
+			if query_dim is None:
+				query_dim = EMBEDDING_DIM
+
 		if payload.mode == RetrievalMode.LEXICAL:
 			rows = await _run_lexical(session, context_uuid, payload.query, payload.top_k)
 			trgm_candidates.inc(payload.top_k * 4)
 		elif payload.mode == RetrievalMode.VECTOR:
-			rows = await _run_vector(session, context_uuid, query_vector, payload.top_k)
+			rows = await _run_vector(session, context_uuid, query_vector, query_dim, payload.top_k)
 			vec_candidates.inc(payload.top_k)
 		else:
-			rows = await _run_hybrid(session, context_uuid, payload, query_vector)
+			rows = await _run_hybrid(session, context_uuid, payload, query_vector, query_dim)
 			vec_candidates.inc(payload.top_k * 4)
 			trgm_candidates.inc(payload.top_k * 4)
 
@@ -101,10 +118,11 @@ async def search(payload: RetrievalSearchRequest):
 	)
 
 
-async def _run_vector(session, context_id: uuid.UUID, query_vector: Sequence[float], limit: int):
+async def _run_vector(session, context_id: uuid.UUID, query_vector: Sequence[float], dim: int, limit: int):
+	stmt = _create_vector_sql_stmt(dim)
 	raw_rows = (
 		await session.execute(
-			_VECTOR_SQL_STMT,
+			stmt,
 			{"document_id": context_id, "qvec": list(query_vector), "limit": max(limit * 4, limit)},
 		)
 	).mappings().all()
@@ -137,7 +155,8 @@ async def _run_lexical(session, context_id: uuid.UUID, query: str, limit: int):
 	return rows
 
 
-async def _run_hybrid(session, context_id: uuid.UUID, payload: RetrievalSearchRequest, query_vector: Sequence[float]):
+async def _run_hybrid(session, context_id: uuid.UUID, payload: RetrievalSearchRequest, query_vector: Sequence[float], dim: int):
+	stmt = _create_hybrid_sql_stmt(dim)
 	params = {
 		"document_id": context_id,
 		"query": payload.query,
@@ -148,7 +167,7 @@ async def _run_hybrid(session, context_id: uuid.UUID, payload: RetrievalSearchRe
 		"top_k": payload.top_k,
 	}
 	params["qvec"] = list(query_vector)
-	raw_rows = (await session.execute(_HYBRID_SQL_STMT, params)).mappings().all()
+	raw_rows = (await session.execute(stmt, params)).mappings().all()
 	rows = []
 	for row in raw_rows:
 		data = dict(row)

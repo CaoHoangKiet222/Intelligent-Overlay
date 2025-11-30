@@ -28,11 +28,24 @@ if __name__ == "__main__":
 	import os
 	
 	port = int(os.getenv("PORT", "8000"))
-	logging.basicConfig(level=logging.INFO)
+	debug_mode = os.getenv("DEBUG", "false").lower() == "true"
+	log_level = logging.DEBUG if debug_mode else logging.INFO
+	
+	logging.basicConfig(
+		level=log_level,
+		format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+	)
 	logger = logging.getLogger(__name__)
 	logger.info(f"Starting Retrieval Service on port {port}")
+	logger.info(f"Debug mode: {debug_mode}")
 	logger.info(f"Health check: http://localhost:{port}/healthz")
 	logger.info(f"Metrics: http://localhost:{port}/metrics")
 	
-	uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)
+	uvicorn.run(
+		"app.main:app",
+		host="0.0.0.0",
+		port=port,
+		reload=debug_mode,
+		log_level="debug" if debug_mode else "info"
+	)
 

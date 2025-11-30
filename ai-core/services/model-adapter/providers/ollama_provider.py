@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 import os
 from typing import List
@@ -75,29 +76,56 @@ class OllamaProvider(BaseProvider):
 			"model": self._generation_model,
 			"messages": [{"role": "user", "content": prompt}],
 			"temperature": 0.2,
+			"stream": False,
 		}
 		try:
 			response = self._post_with_retry(client, CHAT_COMPLETIONS_ENDPOINT, payload)
 		except httpx.HTTPError as exc:
 			raise ProviderCallError(f"ollama chat error: {exc}") from exc
 
-		data = response.json()
-		choices = data.get("choices") or []
-		if not choices:
-			raise ProviderCallError("ollama chat error: empty choices")
+		response_text = response.text.strip()
+		if not response_text:
+			raise ProviderCallError("ollama chat error: empty response")
 
-		message = choices[0].get("message") or {}
+		data = None
+		lines = response_text.split("\n")
+		for line in lines:
+			line = line.strip()
+			if not line:
+				continue
+			try:
+				data = json.loads(line)
+				break
+			except json.JSONDecodeError:
+				continue
+
+		if data is None:
+			try:
+				data = json.loads(response_text)
+			except json.JSONDecodeError as exc:
+				raise ProviderCallError(f"ollama chat error: failed to parse JSON response: {exc}") from exc
+
+		message = data.get("message") or {}
+		if not message:
+			choices = data.get("choices") or []
+			if choices:
+				message = choices[0].get("message") or {}
+
 		content = message.get("content", "")
 		if isinstance(content, list):
 			content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
 
-		usage = data.get("usage") or {}
+		if not content:
+			raise ProviderCallError("ollama chat error: empty content in response")
+
+		tokens_in = data.get("prompt_eval_count") or self.count_tokens(prompt)
+		tokens_out = data.get("eval_count") or self.count_tokens(str(content))
 		latency_ms = int((time.perf_counter() - start) * 1000)
 		return GenerationResult(
 			text=str(content),
 			model=str(data.get("model") or self._generation_model),
-			tokens_in=usage.get("prompt_tokens") or self.count_tokens(prompt),
-			tokens_out=usage.get("completion_tokens") or self.count_tokens(str(content)),
+			tokens_in=int(tokens_in),
+			tokens_out=int(tokens_out),
 			latency_ms=latency_ms,
 		)
 
